@@ -1,0 +1,27 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Java
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# PowerShell
+*.ps1xml
+# (add any transient logs or output dirs you generate)
+
+# General
+logs/
+*.log
+"@ | Out-File -Encoding utf8 .gitignore
