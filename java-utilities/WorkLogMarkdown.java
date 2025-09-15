@@ -11,8 +11,8 @@ import java.util.Set;
 
 public class WorkLogMarkdown {
     // data structure with NZ holidays 2025
-    static LocalDate startDate = LocalDate.of(2025, 9, 1);
-    static LocalDate endDate = LocalDate.of(2025, 9, 15);
+    static LocalDate startDate = LocalDate.of(2025, 9, 16);
+    static LocalDate endDate = LocalDate.of(2025, 9, 25);
     // Removed nzHolidays set to avoid redundancy; use nzHolidays2025.keySet()
 
     static Map<LocalDate, String> nzHolidays2025 = Map.of(
@@ -72,6 +72,8 @@ public class WorkLogMarkdown {
                 // Date formatter for file names
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
                 String fileName = formatter.format(date) + ".md";
+                String markdownDateWithDayOfWeek = formatter.format(date);
+                String titleWorkLogDay = "# " + markdownDateWithDayOfWeek;
 
                 if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
                     System.out.println("skip NZ Weekends " + date.getDayOfWeek() );
@@ -83,13 +85,9 @@ public class WorkLogMarkdown {
                     continue;
                 }
 
-                String markdownContent = "# " + fileName;
-                String title = "# " + fileName;
-                String dayDateFormatted = date.format(DateTimeFormatter.ofPattern("dd MMMM yyyy"));
                 Path filePath = Path.of(fileName);
+                Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
                 
-                Files.writeString(filePath, markdownContent.concat(markdownWorkLogDayStructure));
-                System.out.println("Created: " + fileName);
                 // if friday append textFriday to file
                 if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
                     try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
@@ -99,7 +97,10 @@ public class WorkLogMarkdown {
                         e.printStackTrace();
                     }
                 }
-            } // Loop through each day
+
+                System.out.println("Created markdown file: " + filePath);
+
+            } // end of Loop through each day range
         } catch (IOException e) {
             System.err.println("Error creating file: " + e.getStackTrace());
             e.printStackTrace();
@@ -108,11 +109,12 @@ public class WorkLogMarkdown {
 
     static void printDataStructures() {
         // Print the data structures for debugging
-        System.out.println("NZ Holidays 2025 " + nzHolidays2025 + " " + nzHolidays2025.getClass());
+        System.out.println(nzHolidays2025.getClass() + " NZ Holidays 2025 ");
+        System.out.println(nzHolidays2025);
     }
 
     public static void addContent() {
-        var markdownFilePath = "C:\\Users\\LeonRA\\OneDrive - Air New Zealand\\Documents\\04\\2025-04-30-Wednesday.md";
+        var markdownFilePath = "C:\\Users\\LeonRA\\ws\\04\\2025-04-30-Wednesday.md";
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(markdownFilePath, true))) {
             var xtraMarkdownContent = "extra markdown content to be added";
             writer.write(xtraMarkdownContent);
