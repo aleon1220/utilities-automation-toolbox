@@ -54,8 +54,8 @@ public class WorkLogMarkdown {
     ## Tasks for next business day
     1. 
     
-    ### AirNZ Timesheet submission
-    - AirNZ_Timesheet_code
+    ### Timesheet submission
+    - NZ_Timesheet_code
     """;
 
     static String textFridayTemplate = """
