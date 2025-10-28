@@ -11,8 +11,8 @@ import java.util.Set;
 
 public class WorkLogMarkdown {
     // data structure with NZ holidays 2025
-    static LocalDate startDate = LocalDate.of(2025, 9, 16);
-    static LocalDate endDate = LocalDate.of(2025, 9, 25);
+    static LocalDate startDate = LocalDate.of(2025, 11, 01);
+    static LocalDate endDate = LocalDate.of(2025, 11, 05);
     // Removed nzHolidays set to avoid redundancy; use nzHolidays2025.keySet()
 
     static Map<LocalDate, String> nzHolidays2025 = Map.of(
@@ -64,15 +64,22 @@ public class WorkLogMarkdown {
     3.
     """;
 
+    private static String formatDateForFileName(LocalDate date) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
+        return formatter.format(date) + ".md";
+    }
+
+    private static String createTitleForWorkLog(LocalDate date) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
+        return "# " + formatter.format(date);
+    }
+
     static void createMarkdownFiles() {
         try {
             // Loop through each day range
             for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-                // Date formatter for file names
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
-                String fileName = formatter.format(date) + ".md";
-                String markdownDateWithDayOfWeek = formatter.format(date);
-                String titleWorkLogDay = "# " + markdownDateWithDayOfWeek;
+                String fileName = formatDateForFileName(date);
+                String titleWorkLogDay = createTitleForWorkLog(date);
 
                 if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
                     System.out.println("skip NZ Weekends " + date.getDayOfWeek() );
