@@ -36,7 +36,6 @@ public class WorkLogMarkdown {
 
     ## QUESTIONS
     1. ?
-    2. ?
 
     ## MORNING
     ### TODO_replace_meeting_name
@@ -45,15 +44,15 @@ public class WorkLogMarkdown {
     ## AFTERNOON
             
     ### SRE Chapter standup
-    - todo_important_note
+    1. todo_important_note
             
     ## WRAP UP DAY 
-    ### Day Reflection & Learning
-    1. 
-    
     ## Tasks for next business day
-    1. 
+    1. todo
     
+    ### Day Reflection & Learning
+    1. todo
+
     ### Timesheet submission
     - NZ_Timesheet_code
     """;
@@ -114,12 +113,12 @@ public class WorkLogMarkdown {
     }
 
     public static void addContent() {
-        var markdownFilePath = "C:\\Users\\LeonRA\\ws\\04\\2025-04-30-Wednesday.md";
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(markdownFilePath, true))) {
+        var overrideMarkdownFile = "C:\\ws\\04\\2025-04-30-Wednesday.md";
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFile, true))) {
             var xtraMarkdownContent = "extra markdown content to be added";
             writer.write(xtraMarkdownContent);
             writer.newLine();
-            System.out.println("markdown template added to file " + markdownFilePath);
+            System.out.println("markdown template added to file " + overrideMarkdownFile);
         } catch (IOException e) {
             e.printStackTrace();
         }
