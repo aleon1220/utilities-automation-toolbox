@@ -6,15 +6,14 @@ import java.nio.file.Path;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
 
 public class WorkLogMarkdown {
+    static LocalDate startDate = LocalDate.of(2025, 11, 6);
+    static LocalDate endDate = LocalDate.of(2025, 11, 8);
     // data structure with NZ holidays 2025
-    static LocalDate startDate = LocalDate.of(2025, 11, 01);
-    static LocalDate endDate = LocalDate.of(2025, 11, 05);
-    // Removed nzHolidays set to avoid redundancy; use nzHolidays2025.keySet()
-
     static Map<LocalDate, String> nzHolidays2025 = Map.of(
             LocalDate.of(2025, 1, 1), "New Year's Day",
             LocalDate.of(2025, 1, 2), "Day after New Year's Day",
@@ -29,40 +28,49 @@ public class WorkLogMarkdown {
 
     // markdown templates
     public static String markdownWorkLogDayStructure = """
-    
-    ## GOALS
-    1. 
-    2.
 
-    ## QUESTIONS
-    1. ?
+            ## GOALS
+            1. 
+            2. 
 
-    ## MORNING
-    ### TODO_replace_meeting_name
-    1. todo_important_note
+            ## QUESTIONS
+            1. ?
 
-    ## AFTERNOON
-            
-    ### SRE Chapter standup
-    1. todo_important_note
-            
-    ## WRAP UP DAY 
-    ## Tasks for next business day
-    1. todo
-    
-    ### Day Reflection & Learning
-    1. todo
+            ## MORNING
+            ### TODO_replace_meeting_name
+            1. todo_important_note
 
-    ### Timesheet submission
-    - NZ_Timesheet_code
-    """;
+            ## AFTERNOON
+
+            ### Daily Standup
+            1. ✅ What was done yesterday
+            2. 🔄 What is planned for today
+            3. ❗ blockers & escalations
+
+            ## WRAP UP DAY
+            ## Tasks for next business day
+            1. todo
+            2. todo
+
+            ### Day Reflection & Learning
+            1. todo
+
+            ### Timesheet submission
+            - NZ_Timesheet_Code
+            """;
 
     static String textFridayTemplate = """
-    ## Friday End of Week Reflection, Learning & Next Week Goals
-    1.
-    2.
-    3.
-    """;
+            ## Friday End of Week Reflection, Learning & Next Week Goals
+            1.
+            2.
+            3.
+            """;
+
+    public static void main(String[] args) {
+        printDataStructures();
+        createMarkdownFiles();
+        // addContent();
+    }
 
     private static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
@@ -76,13 +84,18 @@ public class WorkLogMarkdown {
 
     static void createMarkdownFiles() {
         try {
+            if (!validateDateRange(startDate, endDate)) {
+                System.out.println("======= Date Error Validation. Exiting...");
+                return;
+            }
+            System.out.println("Creating markdown files for " + startDate + " to " + endDate);
             // Loop through each day range
             for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
                 String fileName = formatDateForFileName(date);
                 String titleWorkLogDay = createTitleForWorkLog(date);
 
                 if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
-                    System.out.println("skip NZ Weekends " + date.getDayOfWeek() );
+                    System.out.println("skip NZ Weekends " + date.getDayOfWeek());
                     continue;
                 }
 
@@ -93,7 +106,7 @@ public class WorkLogMarkdown {
 
                 Path filePath = Path.of(fileName);
                 Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
-                
+
                 // if friday append textFriday to file
                 if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
                     try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
@@ -131,9 +144,18 @@ public class WorkLogMarkdown {
         }
     }
 
-    public static void main(String[] args) {
-        // addContent();
-        printDataStructures();
-        createMarkdownFiles();
+    static boolean validateDateRange(LocalDate start, LocalDate end) {
+        if (end.isBefore(start)) {
+            System.out.println("======= Date Error Validation: endDate cannot be before startDate");
+            return false;
+        }
+
+        long daysBetween = ChronoUnit.DAYS.between(start, end);
+        if (daysBetween > 30) {
+            System.out.println("======= Error: Date range cannot span more than a Month");
+            return false;
+        }
+
+        return true;
     }
 }
