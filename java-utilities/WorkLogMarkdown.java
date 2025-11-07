@@ -67,8 +67,8 @@ public class WorkLogMarkdown {
             """;
 
     public static void main(String[] args) {
-        printDataStructures();
         createMarkdownFiles();
+        printDataStructures();
         // addContent();
     }
 
@@ -127,12 +127,11 @@ public class WorkLogMarkdown {
     }
 
     static void printDataStructures() {
-        // Print the data structures for debugging
         System.out.println(nzHolidays2025.getClass() + " NZ Holidays 2025 ");
         System.out.println(nzHolidays2025);
     }
 
-    public static void addContent() {
+    public static void addContentToMarkdownFile() {
         var overrideMarkdownFile = "C:\\ws\\04\\2025-04-30-Wednesday.md";
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFile, true))) {
             var xtraMarkdownContent = "extra markdown content to be added";
