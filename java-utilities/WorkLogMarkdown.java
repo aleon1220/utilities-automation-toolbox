@@ -11,8 +11,8 @@ import java.util.Map;
 import java.util.Set;
 
 public class WorkLogMarkdown {
-    static LocalDate startDate = LocalDate.of(2025, 11, 6);
-    static LocalDate endDate = LocalDate.of(2025, 11, 8);
+    static LocalDate startDate = LocalDate.of(2025, 11, 10);
+    static LocalDate endDate = LocalDate.of(2025, 11, 15);
     // data structure with NZ holidays 2025
     static Map<LocalDate, String> nzHolidays2025 = Map.of(
             LocalDate.of(2025, 1, 1), "New Year's Day",
@@ -43,8 +43,8 @@ public class WorkLogMarkdown {
             ## AFTERNOON
 
             ### Daily Standup
-            1. ✅ What was done yesterday
-            2. 🔄 What is planned for today
+            1. ✅ What was done yesterday?
+            2. 🔄 What is planned for today?
             3. ❗ blockers & escalations
 
             ## WRAP UP DAY
@@ -60,10 +60,12 @@ public class WorkLogMarkdown {
             """;
 
     static String textFridayTemplate = """
+
             ## Friday End of Week Reflection, Learning & Next Week Goals
             1.
             2.
             3.
+
             """;
 
     public static void main(String[] args) {
