@@ -11,16 +11,17 @@ import java.util.Map;
 import java.util.Set;
 
 public class WorkLogMarkdown {
-    static LocalDate startDate = LocalDate.of(2025, 11, 10);
-    static LocalDate endDate = LocalDate.of(2025, 11, 15);
-    // data structure with NZ holidays 2025
+    
+    static LocalDate startDate = LocalDate.of(2025, 11, 17);
+    static LocalDate endDate = LocalDate.of(2025, 11, 18);
+    
     static Map<LocalDate, String> nzHolidays2025 = Map.of(
-            LocalDate.of(2025, 1, 1), "New Year's Day",
-            LocalDate.of(2025, 1, 2), "Day after New Year's Day",
+            LocalDate.of(2025, 1, 1), "New Year's Day 2025",
+            LocalDate.of(2025, 1, 2), "Day after New Year's Day Jan 2 2025",
             LocalDate.of(2025, 2, 6), "Waitangi Day",
             LocalDate.of(2025, 4, 21), "Easter Monday",
             LocalDate.of(2025, 4, 25), "ANZAC Day",
-            LocalDate.of(2025, 6, 2), "King's Birthday",
+            LocalDate.of(2025, 6, 2),  "King's Birthday",
             LocalDate.of(2025, 6, 20), "Matariki",
             LocalDate.of(2025, 10, 27), "Labour Day",
             LocalDate.of(2025, 12, 25), "Christmas Day",
@@ -28,10 +29,9 @@ public class WorkLogMarkdown {
 
     // markdown templates
     public static String markdownWorkLogDayStructure = """
-
             ## GOALS
-            1. 
-            2. 
+            1. TODO
+            2. TODO
 
             ## QUESTIONS
             1. ?
@@ -57,12 +57,12 @@ public class WorkLogMarkdown {
 
             ### Timesheet submission
             - NZ_Timesheet_Code
+
             """;
 
     static String textFridayTemplate = """
-
             ## Friday End of Week Reflection, Learning & Next Week Goals
-            1.
+            1. TODO
             2.
             3.
 
@@ -81,7 +81,9 @@ public class WorkLogMarkdown {
 
     private static String createTitleForWorkLog(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
-        return "# " + formatter.format(date);
+        var titleWorkLogConcatenated = "# " + formatter.format(date) + "\n";
+        var titleWorkLogDayFormatted = String.format("# %s \n", formatter.format(date));
+        return titleWorkLogDayFormatted;
     }
 
     static void createMarkdownFiles() {
@@ -109,7 +111,7 @@ public class WorkLogMarkdown {
                 Path filePath = Path.of(fileName);
                 Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
 
-                // if friday append textFriday to file
+                // Fridays append extra block for reflection
                 if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
                     try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
                         writer.write(textFridayTemplate);
@@ -118,7 +120,6 @@ public class WorkLogMarkdown {
                         e.printStackTrace();
                     }
                 }
-
                 System.out.println("Created markdown file: " + filePath);
 
             } // end of Loop through each day range
@@ -129,7 +130,9 @@ public class WorkLogMarkdown {
     }
 
     static void printDataStructures() {
-        System.out.println(nzHolidays2025.getClass() + " NZ Holidays 2025 ");
+        System.out.println("======= Print details");
+        System.out.println("NZ Holidays 2025 - Map Class Type and Contents:");
+        System.out.println(nzHolidays2025.getClass());
         System.out.println(nzHolidays2025);
     }
 
@@ -156,7 +159,6 @@ public class WorkLogMarkdown {
             System.out.println("======= Error: Date range cannot span more than a Month");
             return false;
         }
-
         return true;
-    }
+    } // end of validateDateRange()
 }
