@@ -9,11 +9,36 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+
+import static java.time.Month.JANUARY;
+import static java.time.Month.FEBRUARY;
+import static java.util.Calendar.APRIL;
+import static java.util.Calendar.JUNE;
+import static java.time.Month.JULY;
+import static java.time.Month.OCTOBER;
+import static java.time.Month.DECEMBER;
+
+import static java.util.Map.entry;
 
 class WorkLogMarkdown {
     
-    static LocalDate startDate = LocalDate.of(2025, 12, 7);
-    static LocalDate endDate = LocalDate.of(2025, 12, 8);
+    static LocalDate startDate = LocalDate.of(2026, 1, 5);
+    static LocalDate endDate = LocalDate.of(2026, 1, 17);
+
+    static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
+        entry(LocalDate.of(2026, 1, 1),   "New Year's Day"),
+        entry(LocalDate.of(2026, JANUARY, 2),   "Day after New Year's Day"),
+        entry(LocalDate.of(2026, FEBRUARY, 6),  "Waitangi Day"),
+        entry(LocalDate.of(2026, APRIL, 3),     "Good Friday"),
+        entry(LocalDate.of(2026, APRIL, 6),     "Easter Monday"),
+        entry(LocalDate.of(2026, APRIL, 27),    "Anzac Day (Observed)"), // Actual Sat Apr 25
+        entry(LocalDate.of(2026, JUNE, 1),      "King's Birthday"),
+        entry(LocalDate.of(2026, JULY, 10),     "Matariki"),
+        entry(LocalDate.of(2026, OCTOBER, 26),  "Labour Day"),
+        entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
+        entry(LocalDate.of(2026, DECEMBER, 28), "Boxing Day (Observed)") // Actual Sat Dec 26
+    );
     
     static Map<LocalDate, String> nzHolidays2025 = Map.of(
             LocalDate.of(2025, 1, 1), "New Year's Day 2025",
@@ -72,6 +97,7 @@ class WorkLogMarkdown {
         createMarkdownFiles();
         printDataStructures();
         // addContent();
+        printHolidays();
     }
 
     private static String formatDateForFileName(LocalDate date) {
@@ -103,7 +129,7 @@ class WorkLogMarkdown {
                     continue;
                 }
 
-                if (nzHolidays2025.containsKey(date)) {
+                if (HOLIDAYS_2026.containsKey(date)) {
                     System.out.println("skip NZ holidays " + nzHolidays2025.keySet().getClass());
                     continue;
                 }
@@ -131,8 +157,10 @@ class WorkLogMarkdown {
 
     static void printDataStructures() {
         System.out.println("======= Print details");
-        System.out.println("NZ Holidays 2025 - Map Class Type and Contents:");
+        System.out.println("NZ Holidays 2025 - Map Class Type");
+
         System.out.println(nzHolidays2025.getClass());
+        System.out.println("NZ Holidays 2025 - Contents");
         System.out.println(nzHolidays2025);
     }
 
@@ -161,4 +189,24 @@ class WorkLogMarkdown {
         }
         return true;
     } // end of validateDateRange()
+
+    public static void printHolidays() {
+        Map<LocalDate, String> holidayMap = HOLIDAYS_2026;
+        // Use TreeMap to sort by date automatically
+        var sortedHolidays = new TreeMap<>(holidayMap);
+        var formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy");
+
+        System.out.println("==============================================");
+        System.out.println("     NEW ZEALAND PUBLIC HOLIDAYS 2026         ");
+        System.out.println("==============================================");
+        System.out.printf("%-20s | %-20s%n", "DATE", "HOLIDAY NAME");
+        System.out.println("----------------------------------------------");
+
+        sortedHolidays.forEach((date, name) -> {
+            System.out.printf("%-20s | %-20s%n", date.format(formatter), name);
+        });
+
+        System.out.println("----------------------------------------------");
+        System.out.println("Total: " + sortedHolidays.size() + " National Holidays");
+    }
 }
