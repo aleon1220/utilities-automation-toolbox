@@ -10,10 +10,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
 
-public class WorkLogMarkdown {
+class WorkLogMarkdown {
     
-    static LocalDate startDate = LocalDate.of(2025, 11, 17);
-    static LocalDate endDate = LocalDate.of(2025, 11, 18);
+    static LocalDate startDate = LocalDate.of(2025, 12, 7);
+    static LocalDate endDate = LocalDate.of(2025, 12, 8);
     
     static Map<LocalDate, String> nzHolidays2025 = Map.of(
             LocalDate.of(2025, 1, 1), "New Year's Day 2025",
@@ -68,7 +68,7 @@ public class WorkLogMarkdown {
 
             """;
 
-    public static void main(String[] args) {
+    void main() {
         createMarkdownFiles();
         printDataStructures();
         // addContent();
