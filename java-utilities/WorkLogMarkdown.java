@@ -22,31 +22,31 @@ import static java.time.Month.DECEMBER;
 import static java.util.Map.entry;
 
 class WorkLogMarkdown {
-    
+
     static LocalDate startDate = LocalDate.of(2026, 1, 5);
     static LocalDate endDate = LocalDate.of(2026, 1, 17);
 
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
-        entry(LocalDate.of(2026, 1, 1),   "New Year's Day"),
-        entry(LocalDate.of(2026, JANUARY, 2),   "Day after New Year's Day"),
-        entry(LocalDate.of(2026, FEBRUARY, 6),  "Waitangi Day"),
-        entry(LocalDate.of(2026, APRIL, 3),     "Good Friday"),
-        entry(LocalDate.of(2026, APRIL, 6),     "Easter Monday"),
-        entry(LocalDate.of(2026, APRIL, 27),    "Anzac Day (Observed)"), // Actual Sat Apr 25
-        entry(LocalDate.of(2026, JUNE, 1),      "King's Birthday"),
-        entry(LocalDate.of(2026, JULY, 10),     "Matariki"),
-        entry(LocalDate.of(2026, OCTOBER, 26),  "Labour Day"),
-        entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
-        entry(LocalDate.of(2026, DECEMBER, 28), "Boxing Day (Observed)") // Actual Sat Dec 26
+            entry(LocalDate.of(2026, 1, 1), "New Year's Day"),
+            entry(LocalDate.of(2026, JANUARY, 2), "Day after New Year's Day"),
+            entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
+            entry(LocalDate.of(2026, APRIL, 3), "Good Friday"),
+            entry(LocalDate.of(2026, APRIL, 6), "Easter Monday"),
+            entry(LocalDate.of(2026, APRIL, 27), "Anzac Day (Observed)"), // Actual Sat Apr 25
+            entry(LocalDate.of(2026, JUNE, 1), "King's Birthday"),
+            entry(LocalDate.of(2026, JULY, 10), "Matariki"),
+            entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
+            entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
+            entry(LocalDate.of(2026, DECEMBER, 28), "Boxing Day (Observed)") // Actual Sat Dec 26
     );
-    
+
     static Map<LocalDate, String> nzHolidays2025 = Map.of(
             LocalDate.of(2025, 1, 1), "New Year's Day 2025",
             LocalDate.of(2025, 1, 2), "Day after New Year's Day Jan 2 2025",
             LocalDate.of(2025, 2, 6), "Waitangi Day",
             LocalDate.of(2025, 4, 21), "Easter Monday",
             LocalDate.of(2025, 4, 25), "ANZAC Day",
-            LocalDate.of(2025, 6, 2),  "King's Birthday",
+            LocalDate.of(2025, 6, 2), "King's Birthday",
             LocalDate.of(2025, 6, 20), "Matariki",
             LocalDate.of(2025, 10, 27), "Labour Day",
             LocalDate.of(2025, 12, 25), "Christmas Day",
@@ -94,10 +94,12 @@ class WorkLogMarkdown {
             """;
 
     void main() {
-        createMarkdownFiles();
-        printDataStructures();
+        // createMarkdownFiles();
         // addContent();
+        printDataStructures();
         printHolidays();
+        
+        printDaysUntilEndofMonth(LocalDate.now());
     }
 
     private static String formatDateForFileName(LocalDate date) {
@@ -107,32 +109,24 @@ class WorkLogMarkdown {
 
     private static String createTitleForWorkLog(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
-        var titleWorkLogConcatenated = "# " + formatter.format(date) + "\n";
         var titleWorkLogDayFormatted = String.format("# %s \n", formatter.format(date));
         return titleWorkLogDayFormatted;
     }
 
     static void createMarkdownFiles() {
         try {
+            // Valid Date Range
             if (!validateDateRange(startDate, endDate)) {
                 System.out.println("======= Date Error Validation. Exiting...");
                 return;
             }
+
+            processDateIfEligibleWithBusinessDay(startDate);
             System.out.println("Creating markdown files for " + startDate + " to " + endDate);
             // Loop through each day range
             for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
                 String fileName = formatDateForFileName(date);
                 String titleWorkLogDay = createTitleForWorkLog(date);
-
-                if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
-                    System.out.println("skip NZ Weekends " + date.getDayOfWeek());
-                    continue;
-                }
-
-                if (HOLIDAYS_2026.containsKey(date)) {
-                    System.out.println("skip NZ holidays " + nzHolidays2025.keySet().getClass());
-                    continue;
-                }
 
                 Path filePath = Path.of(fileName);
                 Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
@@ -208,5 +202,58 @@ class WorkLogMarkdown {
 
         System.out.println("----------------------------------------------");
         System.out.println("Total: " + sortedHolidays.size() + " National Holidays");
+    }
+
+    static void printDaysUntilEndofMonth(LocalDate date) {
+        LocalDate endOfMonth = date.withDayOfMonth(date.lengthOfMonth());
+        long daysUntilEndOfMonth = ChronoUnit.DAYS.between(date, endOfMonth);
+        System.out.println("Days until end of month from " + date + ": " + daysUntilEndOfMonth);
+
+        System.out.println("\n=== date names for Rest of Month ===");
+        for (LocalDate current = date; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
+            System.out.println("Title " + createTitleForWorkLog(current));
+            // System.out.printf("  %n%n%-40s | %s%n", formatDateForFileName(current), current.getDayOfWeek());
+        }
+        System.out.printf("  %n%n%-40s | %s%n", formatDateForFileName(date), date.getDayOfWeek());
+        System.out.println("================================\n");
+    }
+
+    // will try to replace the date validation logic in createMarkdownFiles() with
+    // methods
+    static boolean isValidDateRange(LocalDate start, LocalDate end) {
+        var result = performDateValidation(start, end);
+        if (result.hasError()) {
+            System.out.println("======= " + result.errorMessage());
+        }
+        return !result.hasError();
+    }
+
+    private record DateValidationResult(boolean valid, String errorMessage) {
+        boolean hasError() {
+            return !valid;
+        }
+    }
+
+    private static DateValidationResult performDateValidation(LocalDate start, LocalDate end) {
+        if (end.isBefore(start)) {
+            return new DateValidationResult(false, "Date Error Validation: endDate cannot be before startDate");
+        }
+
+        long daysBetween = ChronoUnit.DAYS.between(start, end);
+        if (daysBetween > 30) {
+            return new DateValidationResult(false, "Error: Date range cannot span more than a Month");
+        }
+
+        return new DateValidationResult(true, "");
+    }
+
+    static void processDateIfEligibleWithBusinessDay(LocalDate date) {
+        if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            System.out.println("skip NZ Weekends " + date.getDayOfWeek());
+        }
+
+        if (HOLIDAYS_2026.containsKey(date)) {
+            System.out.println("skip NZ holidays " + nzHolidays2025.keySet().getClass());
+        }
     }
 }
