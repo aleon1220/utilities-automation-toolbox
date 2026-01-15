@@ -13,8 +13,8 @@ import java.util.TreeMap;
 
 import static java.time.Month.JANUARY;
 import static java.time.Month.FEBRUARY;
-import static java.util.Calendar.APRIL;
-import static java.util.Calendar.JUNE;
+import static java.time.Month.APRIL;
+import static java.time.Month.JUNE;
 import static java.time.Month.JULY;
 import static java.time.Month.OCTOBER;
 import static java.time.Month.DECEMBER;
@@ -23,7 +23,7 @@ import static java.util.Map.entry;
 
 class WorkLogMarkdown {
 
-    static LocalDate startDate = LocalDate.of(2026, 1, 5);
+    static LocalDate startDate = LocalDate.of(2026, 1, 14);
     static LocalDate endDate = LocalDate.of(2026, 1, 17);
 
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
@@ -32,7 +32,7 @@ class WorkLogMarkdown {
             entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
             entry(LocalDate.of(2026, APRIL, 3), "Good Friday"),
             entry(LocalDate.of(2026, APRIL, 6), "Easter Monday"),
-            entry(LocalDate.of(2026, APRIL, 27), "Anzac Day (Observed)"), // Actual Sat Apr 25
+            entry(LocalDate.of(2026, APRIL, 27), "Anzac Day (Observed)"), // Actual Saturday Apr 25
             entry(LocalDate.of(2026, JUNE, 1), "King's Birthday"),
             entry(LocalDate.of(2026, JULY, 10), "Matariki"),
             entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
@@ -55,22 +55,23 @@ class WorkLogMarkdown {
     // markdown templates
     public static String markdownWorkLogDayStructure = """
             ## GOALS
-            1. TODO
-            2. TODO
+            1. goal_1
+            2. goal_2
 
             ## QUESTIONS
             1. ?
 
             ## MORNING
-            ### TODO_replace_meeting_name
-            1. todo_important_note
-
-            ## AFTERNOON
 
             ### Daily Standup
             1. ✅ What was done yesterday?
             2. 🔄 What is planned for today?
             3. ❗ blockers & escalations
+
+            ### TODO_replace_meeting_name
+            1. todo_important_note
+
+            ## AFTERNOON
 
             ## WRAP UP DAY
             ## Tasks for next business day
@@ -87,19 +88,24 @@ class WorkLogMarkdown {
 
     static String textFridayTemplate = """
             ## Friday End of Week Reflection, Learning & Next Week Goals
-            1. TODO
+            1. reflection
             2.
             3.
 
             """;
 
     void main() {
-        // createMarkdownFiles();
+        System.out.println("Hello, Java 25!");
+        try {
+            createMarkdownFiles();
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
         // addContent();
-        printDataStructures();
-        printHolidays();
-        
-        printDaysUntilEndofMonth(LocalDate.now());
+        // printDataStructures();
+        // printHolidays();
+        // printDaysUntilEndofMonth(LocalDate.now());
     }
 
     private static String formatDateForFileName(LocalDate date) {
@@ -113,46 +119,39 @@ class WorkLogMarkdown {
         return titleWorkLogDayFormatted;
     }
 
-    static void createMarkdownFiles() {
-        try {
-            // Valid Date Range
-            if (!validateDateRange(startDate, endDate)) {
-                System.out.println("======= Date Error Validation. Exiting...");
-                return;
+    static void createMarkdownFiles() throws IOException {
+        if (!isValidDateRange(startDate, endDate)) {
+            return;
+        }
+
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            // Logic fixed: Skip if it IS a weekend OR if it IS a holiday
+            if (isWeekend(date)) {
+                System.out.println("Skipping Weekend: " + date);
+                continue;
             }
 
-            processDateIfEligibleWithBusinessDay(startDate);
-            System.out.println("Creating markdown files for " + startDate + " to " + endDate);
-            // Loop through each day range
-            for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-                String fileName = formatDateForFileName(date);
-                String titleWorkLogDay = createTitleForWorkLog(date);
+            if (isNZHoliday(date)) {
+                System.out.println("Skipping Holiday: " + HOLIDAYS_2026.get(date));
+                continue;
+            }
 
-                Path filePath = Path.of(fileName);
-                Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
+            String fileName = formatDateForFileName(date);
+            String titleWorkLogDay = createTitleForWorkLog(date);
+            Path filePath = Path.of(fileName);
+            Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
 
-                // Fridays append extra block for reflection
-                if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
-                        writer.write(textFridayTemplate);
-                        System.out.println("Friday reflection block added " + fileName);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+            if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
+                    writer.write(textFridayTemplate);
                 }
-                System.out.println("Created markdown file: " + filePath);
-
-            } // end of Loop through each day range
-        } catch (IOException e) {
-            System.err.println("Error creating file: " + e.getStackTrace());
-            e.printStackTrace();
+            }
         }
     }
 
     static void printDataStructures() {
         System.out.println("======= Print details");
         System.out.println("NZ Holidays 2025 - Map Class Type");
-
         System.out.println(nzHolidays2025.getClass());
         System.out.println("NZ Holidays 2025 - Contents");
         System.out.println(nzHolidays2025);
@@ -212,14 +211,13 @@ class WorkLogMarkdown {
         System.out.println("\n=== date names for Rest of Month ===");
         for (LocalDate current = date; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
             System.out.println("Title " + createTitleForWorkLog(current));
-            // System.out.printf("  %n%n%-40s | %s%n", formatDateForFileName(current), current.getDayOfWeek());
+            // System.out.printf(" %n%n%-40s | %s%n", formatDateForFileName(current),
+            // current.getDayOfWeek());
         }
         System.out.printf("  %n%n%-40s | %s%n", formatDateForFileName(date), date.getDayOfWeek());
         System.out.println("================================\n");
     }
 
-    // will try to replace the date validation logic in createMarkdownFiles() with
-    // methods
     static boolean isValidDateRange(LocalDate start, LocalDate end) {
         var result = performDateValidation(start, end);
         if (result.hasError()) {
@@ -228,13 +226,13 @@ class WorkLogMarkdown {
         return !result.hasError();
     }
 
-    private record DateValidationResult(boolean valid, String errorMessage) {
+    record DateValidationResult(boolean valid, String errorMessage) {
         boolean hasError() {
             return !valid;
         }
     }
 
-    private static DateValidationResult performDateValidation(LocalDate start, LocalDate end) {
+    static DateValidationResult performDateValidation(LocalDate start, LocalDate end) {
         if (end.isBefore(start)) {
             return new DateValidationResult(false, "Date Error Validation: endDate cannot be before startDate");
         }
@@ -247,13 +245,16 @@ class WorkLogMarkdown {
         return new DateValidationResult(true, "");
     }
 
-    static void processDateIfEligibleWithBusinessDay(LocalDate date) {
-        if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
-            System.out.println("skip NZ Weekends " + date.getDayOfWeek());
-        }
+    static boolean isNZHoliday(LocalDate date) {
+        // Returns TRUE if it IS a holiday (Simple check)
+        return HOLIDAYS_2026.containsKey(date);
+    }
 
-        if (HOLIDAYS_2026.containsKey(date)) {
-            System.out.println("skip NZ holidays " + nzHolidays2025.keySet().getClass());
-        }
+    static boolean isWeekend(LocalDate date) {
+        return switch (date.getDayOfWeek()) {
+            case SATURDAY, SUNDAY -> true;
+            // Returns FALSE for Mon-Fri
+            default -> false;
+        };
     }
 }
