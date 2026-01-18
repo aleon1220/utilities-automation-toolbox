@@ -23,8 +23,8 @@ import static java.util.Map.entry;
 
 class WorkLogMarkdown {
 
-    static LocalDate startDate = LocalDate.of(2026, 1, 14);
-    static LocalDate endDate = LocalDate.of(2026, 1, 17);
+    static LocalDate startDate = LocalDate.of(2026, 1, 19);
+    static LocalDate endDate = LocalDate.of(2026, 1, 31);
 
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, 1, 1), "New Year's Day"),
@@ -95,17 +95,12 @@ class WorkLogMarkdown {
             """;
 
     void main() {
+        // createMarkdownFiles();
+        printDaysUntilEndofMonth(LocalDate.now());
+        printDataStructures();
         System.out.println("Hello, Java 25!");
-        try {
-            createMarkdownFiles();
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
         // addContent();
-        // printDataStructures();
-        // printHolidays();
-        // printDaysUntilEndofMonth(LocalDate.now());
+        printHolidays();
     }
 
     private static String formatDateForFileName(LocalDate date) {
