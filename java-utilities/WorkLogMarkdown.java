@@ -95,7 +95,7 @@ class WorkLogMarkdown {
             """;
 
     void main() {
-        // createMarkdownFiles();
+        createMarkdownFiles();
         printDaysUntilEndofMonth(LocalDate.now());
         printDataStructures();
         System.out.println("Hello, Java 25!");
@@ -114,33 +114,38 @@ class WorkLogMarkdown {
         return titleWorkLogDayFormatted;
     }
 
-    static void createMarkdownFiles() throws IOException {
+    static void createMarkdownFiles() {
         if (!isValidDateRange(startDate, endDate)) {
             return;
         }
 
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            // Logic fixed: Skip if it IS a weekend OR if it IS a holiday
-            if (isWeekend(date)) {
-                System.out.println("Skipping Weekend: " + date);
-                continue;
-            }
+        try {
+            for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+                // Logic fixed: Skip if it IS a weekend OR if it IS a holiday
+                if (isWeekend(date)) {
+                    System.out.println("Skipping Weekend: " + date);
+                    continue;
+                }
 
-            if (isNZHoliday(date)) {
-                System.out.println("Skipping Holiday: " + HOLIDAYS_2026.get(date));
-                continue;
-            }
+                if (isNZHoliday(date)) {
+                    System.out.println("Skipping Holiday: " + HOLIDAYS_2026.get(date));
+                    continue;
+                }
 
-            String fileName = formatDateForFileName(date);
-            String titleWorkLogDay = createTitleForWorkLog(date);
-            Path filePath = Path.of(fileName);
-            Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
+                String fileName = formatDateForFileName(date);
+                String titleWorkLogDay = createTitleForWorkLog(date);
+                Path filePath = Path.of(fileName);
+                Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
 
-            if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
-                    writer.write(textFridayTemplate);
+                if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
+                        writer.write(textFridayTemplate);
+                    }
                 }
             }
+        } catch (IOException e) {
+            System.err.println("Error creating markdown files: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
