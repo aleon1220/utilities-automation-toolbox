@@ -55,8 +55,9 @@ class WorkLogMarkdown {
     // markdown templates
     public static String markdownWorkLogDayStructure = """
             ## GOALS
-            1. goal_1
-            2. goal_2
+            1. [WaterDo tasks](https://waterdo.app/en/tasks/)
+            2. goal_1
+            3. goal_2
 
             ## QUESTIONS
             1. ?
@@ -87,7 +88,7 @@ class WorkLogMarkdown {
             """;
 
     static String textFridayTemplate = """
-            ## Friday End of Week Reflection, Learning & Next Week Goals
+            ## Friday Reflection Time | Learning & Next Week Goals
             1. reflection
             2.
             3.
@@ -96,16 +97,15 @@ class WorkLogMarkdown {
 
     void main() {
         createMarkdownFiles();
-        printDaysUntilEndofMonth(LocalDate.now());
         printDataStructures();
-        System.out.println("Hello, Java 25!");
-        // addContent();
         printHolidays();
+        printDaysUntilEndofMonth(LocalDate.now());
+        // addContent();
     }
 
     private static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
-        return formatter.format(date) + ".md";
+        return formatter.format(date);
     }
 
     private static String createTitleForWorkLog(LocalDate date) {
@@ -123,7 +123,7 @@ class WorkLogMarkdown {
             for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
                 // Logic fixed: Skip if it IS a weekend OR if it IS a holiday
                 if (isWeekend(date)) {
-                    System.out.println("Skipping Weekend: " + date);
+                    System.out.println("Skipping Weekend for " + formatDateForFileName(date));
                     continue;
                 }
 
@@ -132,7 +132,7 @@ class WorkLogMarkdown {
                     continue;
                 }
 
-                String fileName = formatDateForFileName(date);
+                String fileName = formatDateForFileName(date).concat(".md");
                 String titleWorkLogDay = createTitleForWorkLog(date);
                 Path filePath = Path.of(fileName);
                 Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
@@ -150,10 +150,9 @@ class WorkLogMarkdown {
     }
 
     static void printDataStructures() {
-        System.out.println("======= Print details");
-        System.out.println("NZ Holidays 2025 - Map Class Type");
-        System.out.println(nzHolidays2025.getClass());
-        System.out.println("NZ Holidays 2025 - Contents");
+        System.out.println("======= Print details using using Java 25!");
+        System.out.println("======= Map Class Type " + nzHolidays2025.getClass());
+        System.out.println("======= NZ Holidays 2025 - Contents");
         System.out.println(nzHolidays2025);
     }
 
@@ -206,11 +205,12 @@ class WorkLogMarkdown {
     static void printDaysUntilEndofMonth(LocalDate date) {
         LocalDate endOfMonth = date.withDayOfMonth(date.lengthOfMonth());
         long daysUntilEndOfMonth = ChronoUnit.DAYS.between(date, endOfMonth);
-        System.out.println("Days until end of month from " + date + ": " + daysUntilEndOfMonth);
+        System.out.println("======= Days from today until end of Month from " + formatDateForFileName(date) );
+        System.out.println(String.format("%s ", daysUntilEndOfMonth) + "Days till end of the Month ");
+        System.out.println("======= Finishing month of " + date.getMonth() + " Total Days " + daysUntilEndOfMonth);
 
-        System.out.println("\n=== date names for Rest of Month ===");
         for (LocalDate current = date; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
-            System.out.println("Title " + createTitleForWorkLog(current));
+            System.out.println(createTitleForWorkLog(current));
             // System.out.printf(" %n%n%-40s | %s%n", formatDateForFileName(current),
             // current.getDayOfWeek());
         }
