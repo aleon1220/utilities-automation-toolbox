@@ -25,3 +25,10 @@ target/
 logs/
 *.log
 "@ | Out-File -Encoding utf8 .gitignore
+
+# IDE IntelliJ IDEA
+/out/
+.idea/
+*.iml
+*.iws
+*.ipr
