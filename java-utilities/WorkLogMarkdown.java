@@ -197,7 +197,7 @@ class WorkLogMarkdown {
         });
 
         System.out.println("Total: " + sortedHolidays.size() + " National Holidays");
-        System.out.println("----------------------------------------------");
+        System.out.println("----------------------------------------------%n");
     }
 
     static void printDaysUntilEndofMonth(LocalDate date) {
@@ -213,23 +213,24 @@ class WorkLogMarkdown {
                 + daysUntilEndOfMonth);
 
         System.out.println("======= Listing remaining days until end of month");
-
         int lastWeek = -1;
-        WeekFields weekFields = WeekFields.of(Locale.getDefault());
+        // WeekFields weekFields = WeekFields.ISO; // ISO standard for week numbering
+        WeekFields weekFields = WeekFields.of(Locale.of("en", "NZ"));
+        // WeekFields weekFields = WeekFields.of(Locale.of("en", "UK"));
 
         for (LocalDate current = date; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
             int currentWeek = current.get(weekFields.weekOfWeekBasedYear());
-            System.out.println(createTitleForWorkLog(current));
-            
+
             if (currentWeek != lastWeek) {
-                System.out.printf("%n======= Header for a new week =======", currentWeek);
+                System.out.printf("%n======= Header for a new week =======");
                 System.out.printf("%n Week Number %d%n", currentWeek);
                 lastWeek = currentWeek;
             }
+            System.out.println(createTitleForWorkLog(current));
         }
 
         System.out.printf("  %n%n%-40s | %s%n", formatDateForFileName(date), date.getDayOfWeek());
-        System.out.println("----------------------------------------------");
+        System.out.println("----------------------------------------------%n");
     }
 
     static boolean isValidDateRange(LocalDate start, LocalDate end) {
