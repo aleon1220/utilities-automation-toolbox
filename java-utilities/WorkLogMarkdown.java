@@ -65,9 +65,14 @@ class WorkLogMarkdown {
             ## MORNING
 
             ### Daily Standup
-            1. ✅ What was done yesterday?   **todo_done**
-            2. 🔄 What is planned for today? **todo_planned**
-            3. ❗ blockers & escalations     **todo_blockers**
+            1. ✅ What was done yesterday
+              - **todo_done**
+              - **todo_done**
+            2. 🔄 What is planned for today
+              - **todo_planned**
+              - **todo_planned**
+            3. ❗ blockers & escalations
+              - **todo_blocker**
 
             ### TODO_replace_meeting_name
             1. todo_important_note
