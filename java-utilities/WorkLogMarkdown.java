@@ -27,8 +27,8 @@ import static java.util.Map.entry;
 
 class WorkLogMarkdown {
 
-    static LocalDate startDate = LocalDate.of(2026, 2, 10);
-    static LocalDate endDate = LocalDate.of(2026, 2, 28);
+    static LocalDate startDate = LocalDate.of(2026, 2, 20);
+    static LocalDate endDate = LocalDate.of(2026, 2, 25);
 
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(entry(LocalDate.of(2026, 1, 1), "New Year's Day"),
             entry(LocalDate.of(2026, JANUARY, 2), "Day after New Year's Day"),
@@ -55,9 +55,9 @@ class WorkLogMarkdown {
     // markdown templates
     public static String markdownWorkLogDayStructure = """
             ## GOALS
-            1. [WaterDo tasks](https://waterdo.app/en/tasks/)
-            2. goal_1
-            3. goal_2
+            1. Main Planning System
+            2. [WaterDo tasks](https://waterdo.app/en/tasks/) tidy up to Trello
+            3. ART planning system
 
             ## QUESTIONS
             1. ?
@@ -74,10 +74,9 @@ class WorkLogMarkdown {
             3. ❗ blockers & escalations
               - **todo_blocker**
 
-            ### TODO_replace_meeting_name
-            1. todo_important_note
-
             ## AFTERNOON
+            ### TODO_activity_name
+            1. todo_important_note
 
             ## WRAP UP DAY
             ## Tasks for next business day
@@ -92,7 +91,8 @@ class WorkLogMarkdown {
             """;
 
     static String textFridayTemplate = """
-            ## Friday Reflection Time | Learning & Next Week Goals
+
+            ## End of week Reflection | Learning & Next Goals
             1. reflection
             2.
             3.
