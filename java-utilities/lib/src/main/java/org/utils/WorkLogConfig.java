@@ -1,3 +1,5 @@
+package org.utils;
+
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -24,33 +26,25 @@ import java.time.temporal.WeekFields;
 import java.util.Locale;
 
 import static java.util.Map.entry;
+import java.time.LocalDate;
+import java.util.Optional;
 
-class WorkLogMarkdown {
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 
-    static LocalDate startDate = LocalDate.of(2026, 2, 20);
-    static LocalDate endDate = LocalDate.of(2026, 2, 25);
+// The @CommandLineSchema annotation tells the JVM how to map args to this record
+@Command(name = "worklog", description = "Work log configuration tool")
+public class WorkLogConfig implements Runnable {
 
-    static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(entry(LocalDate.of(2026, 1, 1), "New Year's Day"),
-            entry(LocalDate.of(2026, JANUARY, 2), "Day after New Year's Day"),
-            entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
-            entry(LocalDate.of(2026, APRIL, 3), "Good Friday"),
-            entry(LocalDate.of(2026, APRIL, 6), "Easter Monday"),
-            entry(LocalDate.of(2026, APRIL, 27), "Anzac Day (Observed)"), // Actual Saturday
-                                                                          // Apr 25
-            entry(LocalDate.of(2026, JUNE, 1), "King's Birthday"),
-            entry(LocalDate.of(2026, JULY, 10), "Matariki"),
-            entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
-            entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
-            entry(LocalDate.of(2026, DECEMBER, 28), "Boxing Day (Observed)") // Actual Sat
-                                                                             // Dec 26
-    );
+    @Option(names = { "-s", "--start" }, description = "Start date")
+    Optional<LocalDate> startDate = Optional.empty();
 
-    static Map<LocalDate, String> nzHolidays2025 = Map.of(LocalDate.of(2025, 1, 1),
-            "New Year's Day 2025", LocalDate.of(2025, 1, 2), "Day after New Year's Day Jan 2 2025",
-            LocalDate.of(2025, 2, 6), "Waitangi Day", LocalDate.of(2025, 4, 21), "Easter Monday",
-            LocalDate.of(2025, 4, 25), "ANZAC Day", LocalDate.of(2025, 6, 2), "King's Birthday",
-            LocalDate.of(2025, 6, 20), "Matariki", LocalDate.of(2025, 10, 27), "Labour Day",
-            LocalDate.of(2025, 12, 25), "Christmas Day", LocalDate.of(2025, 12, 26), "Boxing Day");
+    @Option(names = { "-e", "--end" }, description = "End date")
+    Optional<LocalDate> endDate = Optional.empty();
+
+    @Option(names = { "-h", "--help" }, usageHelp = true, description = "Display this help message")
+    boolean help;
 
     // markdown templates
     public static String markdownWorkLogDayStructure = """
@@ -90,6 +84,21 @@ class WorkLogMarkdown {
             - NZ_Timesheet_Code
             """;
 
+    static LocalDate endOfMonth = LocalDate.now().withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
+
+    static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
+        entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
+        entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
+        entry(LocalDate.of(2026, APRIL, 13), "Easter Monday"),
+        entry(LocalDate.of(2026, APRIL, 25), "ANZAC Day"),
+        entry(LocalDate.of(2026, JUNE, 1), "Queen's Birthday"),
+        entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
+        entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
+        entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day")
+    );
+
+    static final Map<LocalDate, String> nzHolidays2025 = HOLIDAYS_2026;
+
     static String textFridayTemplate = """
 
             ## End of week Reflection | Learning & Next Goals
@@ -98,13 +107,7 @@ class WorkLogMarkdown {
             3.
             """;
 
-    void main() {
-        printHolidays();
-        printDaysUntilEndofMonth(LocalDate.now());
-        createMarkdownFiles();
-        printDataStructures();
-        // addContent();
-    }
+
 
     private static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
@@ -117,13 +120,18 @@ class WorkLogMarkdown {
         return titleWorkLogDayFormatted;
     }
 
-    static void createMarkdownFiles() {
-        if (!isValidDateRange(startDate, endDate)) {
+    void createMarkdownFiles() {
+        if (!startDate.isPresent() || !endDate.isPresent()) {
+            System.out.println("Start and end dates are required");
+            return;
+        }
+
+        if (!isValidDateRange(startDate.get(), endDate.get())) {
             return;
         }
 
         try {
-            for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            for (LocalDate date = startDate.get(); !date.isAfter(endDate.get()); date = date.plusDays(1)) {
                 // Logic fixed: Skip if it IS a weekend OR if it IS a holiday
                 if (isWeekend(date)) {
                     System.out.println("Skipping Weekend for " + formatDateForFileName(date));
@@ -152,7 +160,7 @@ class WorkLogMarkdown {
         }
     }
 
-    static void printDataStructures() {
+    public static void printDataStructures() {
         System.out.println("======= Print details using using Java 25!");
         System.out.println("======= Map Class Type " + nzHolidays2025.getClass());
         System.out.println("======= NZ Holidays 2025 - Contents");
@@ -206,7 +214,7 @@ class WorkLogMarkdown {
     }
 
     static void printDaysUntilEndofMonth(LocalDate date) {
-        LocalDate endOfMonth = date.withDayOfMonth(date.lengthOfMonth());
+
         long daysUntilEndOfMonth = ChronoUnit.DAYS.between(date, endOfMonth);
         int weekNumber = date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
         System.out.println("======= Printing info until End of Month =======");
@@ -278,5 +286,20 @@ class WorkLogMarkdown {
             // Returns FALSE for Mon-Fri
             default -> false;
         };
+    }
+
+    @Override
+    public void run() {
+        printHolidays();
+        printDaysUntilEndofMonth(LocalDate.now());
+        if (startDate.isPresent() && endDate.isPresent()) {
+            createMarkdownFiles();
+        }
+        printDataStructures();
+    }
+
+    public static void main(String[] args) {
+        int exitCode = new CommandLine(new WorkLogConfig()).execute(args);
+        System.exit(exitCode);
     }
 }
