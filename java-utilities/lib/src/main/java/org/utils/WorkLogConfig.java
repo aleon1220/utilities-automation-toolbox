@@ -50,7 +50,7 @@ public class WorkLogConfig implements Runnable {
     public static String markdownWorkLogDayStructure = """
             ## GOALS
             1. Main Planning System
-            2. [WaterDo tasks](https://waterdo.app/en/tasks/) tidy up to Trello
+            2. [Trello](https://trello.com/c/63qYHZ9V)
             3. ART planning system
 
             ## QUESTIONS
