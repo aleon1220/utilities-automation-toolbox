@@ -42,8 +42,11 @@ jobs:
             # 2. Check if improvement branch exists based on naming pattern
             # https://cli.github.com/manual/gh_api
             
-            BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --include "%{http_code}" || echo "404")
-
+            BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --include "%{http_code}" || echo "404")
+            echo "debug output from $BRANCH_GEN_AI "
+            echo "=================*** "
+            
+            BRANCH_EXISTS=$(gh api --include repos/{owner}/{repo}/branches/{branch} --jq .message || echo "404")
             if [ "$BRANCH_EXISTS" -eq "200" ]; then
               echo "gh Branch found! Checking for existing PRs..."
               
@@ -70,6 +73,7 @@ jobs:
       - name: notify Approvers
         run: |
           echo "stub todo:add reviewers"
+
 
 
 
