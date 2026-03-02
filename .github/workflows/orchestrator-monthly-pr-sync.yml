@@ -13,15 +13,14 @@ jobs:
       - name: Calculate Target Branch Name
         id: vars
         run: |
-          # Get previous month details (e.g., 2026 01 january)
           # Using 'last month' logic ensures we check the month that just ended
           YEAR=$(date -d "last month" +%Y)
           MONTH_NUM=$(date -d "last month" +%m)
           MONTH_NAME=$(date -d "last month" +%B | tr '[:upper:]' '[:lower:]')
-          
+          # previous month pattern e.g. 2026-01-january
           echo "branch_pattern=${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements" >> $GITHUB_OUTPUT
 
-      - name: Process Repositories
+      - name: Process GitHub Repositories
         env:
           GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
           BRANCH_NAME: ${{ steps.vars.outputs.branch_pattern }}
@@ -35,17 +34,19 @@ jobs:
           for REPO in $REPOS; do
             echo "Checking $ORG_NAME/$REPO..."
             
-            # 2. Check if the specific improvement branch exists
-            BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME -w "%{http_code}" || echo "404")
+            # 2. Check if improvement branch exists based on naming pattern
+            # https://cli.github.com/manual/gh_api
+            echo "evaluating HTTP code %{http_code}" 
+            BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --include "%{http_code}" || echo "404")
 
             if [ "$BRANCH_EXISTS" -eq "200" ]; then
-              echo "Branch found! Checking for existing PRs..."
+              echo "gh Branch found! Checking for existing PRs..."
               
-              # 3. Check if a PR already exists to avoid duplicates
+              # Check if a PR already exists to avoid duplicates
               PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
 
               if [ -z "$PR_EXISTS" ]; then
-                echo "Creating PR for $REPO..."
+                echo "Creating Monthly Pull Request for $REPO..."
                 gh pr create \
                   -R $ORG_NAME/$REPO \
                   -B main \
@@ -58,4 +59,5 @@ jobs:
             else
               echo "Branch not found in $REPO."
             fi
+
           done
