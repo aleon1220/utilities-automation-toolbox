@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.utils.WorkLogConfig;
 
 class WorkLogConfigTest {
-    @Test void someLibraryMethodReturnsTrue() {
+    @Test void methodRunLibraryReturnsTrue() {
         WorkLogConfig classUnderTest = new WorkLogConfig();
         assertDoesNotThrow(() -> classUnderTest.run(), "run() should execute without throwing an exception");
     }
