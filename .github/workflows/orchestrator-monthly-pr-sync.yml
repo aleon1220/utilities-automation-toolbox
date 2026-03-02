@@ -1,0 +1,61 @@
+name: Monthly Branch Improvement Sync
+
+on:
+  schedule:
+    # Runs at 00:00 on the 1st of every month to catch the previous month's branch
+    - cron: '0 0 1 * *'
+  workflow_dispatch: # Allows manual testing
+
+jobs:
+  find-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Calculate Target Branch Name
+        id: vars
+        run: |
+          # Get previous month details (e.g., 2026 01 january)
+          # Using 'last month' logic ensures we check the month that just ended
+          YEAR=$(date -d "last month" +%Y)
+          MONTH_NUM=$(date -d "last month" +%m)
+          MONTH_NAME=$(date -d "last month" +%B | tr '[:upper:]' '[:lower:]')
+          
+          echo "branch_pattern=${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements" >> $GITHUB_OUTPUT
+
+      - name: Process Repositories
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
+          BRANCH_NAME: ${{ steps.vars.outputs.branch_pattern }}
+          ORG_NAME: "aleon1220"
+        run: |
+          echo "Searching for branch: $BRANCH_NAME"
+          
+          # 1. Get list of all non-archived repos in the org/account
+          REPOS=$(gh repo list $ORG_NAME --limit 1000 --json name --jq '.[].name')
+
+          for REPO in $REPOS; do
+            echo "Checking $ORG_NAME/$REPO..."
+            
+            # 2. Check if the specific improvement branch exists
+            BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --silent -w "%{http_code}" || echo "404")
+
+            if [ "$BRANCH_EXISTS" -eq "200" ]; then
+              echo "Branch found! Checking for existing PRs..."
+              
+              # 3. Check if a PR already exists to avoid duplicates
+              PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
+
+              if [ -z "$PR_EXISTS" ]; then
+                echo "Creating PR for $REPO..."
+                gh pr create \
+                  -R $ORG_NAME/$REPO \
+                  -B main \
+                  -H $BRANCH_NAME \
+                  -t "Monthly Improvements: $BRANCH_NAME" \
+                  -b "Automated PR to merge monthly improvements from $BRANCH_NAME into main."
+              else
+                echo "PR already exists (#$PR_EXISTS). Skipping."
+              fi
+            else
+              echo "Branch not found in $REPO."
+            fi
+          done
