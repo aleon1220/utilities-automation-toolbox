@@ -41,28 +41,24 @@ jobs:
             echo "================="
             # 2. Check if improvement branch exists based on naming pattern
             # https://cli.github.com/manual/gh_api
-            
-            BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --include "%{http_code}" || echo "404")
-            echo "debug output from $BRANCH_GEN_AI "
             echo "=================*** "
-            
-            BRANCH_EXISTS=$(gh api --include repos/{owner}/{repo}/branches/{branch} --jq .message || echo "404")
-            if [ "$BRANCH_EXISTS" -eq "200" ]; then
-              echo "gh Branch found! Checking for existing PRs..."
+            BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
+            if [ "$BRANCH_GEN_AI" != "404" ]; then
+              echo "github Branch found! Checking for existing PRs..."
               
               # Check if a PR already exists to avoid duplicates
               PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
 
               if [ -z "$PR_EXISTS" ]; then
-                echo "Creating Monthly Pull Request for $REPO..."
+                echo "Creating Monthly Pull Request for repository $REPO..."
                 gh pr create \
                   -R $ORG_NAME/$REPO \
                   -B main \
                   -H $BRANCH_NAME \
                   -t "Monthly Improvements: $BRANCH_NAME" \
-                  -b "Automated PR to merge monthly improvements from $BRANCH_NAME into main."
+                  -b "github Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main."
               else
-                echo "PR already exists (#$PR_EXISTS). Skipping."
+                echo "PR exists (#$PR_EXISTS). Skipping."
               fi
             else
               echo "error in execution"
