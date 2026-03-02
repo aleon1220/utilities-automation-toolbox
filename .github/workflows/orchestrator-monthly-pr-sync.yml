@@ -31,7 +31,7 @@ jobs:
           # 1. Get list of all non-archived repos in the org/account
           REPOS=$(gh repo list $ORG_NAME --limit 1000 --json name --jq '.[].name')
           
-          gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --verbose
+          gh api "repos/$ORG_NAME/$REPOS[1]/branches/$BRANCH_NAME" --verbose
           echo "repos extracted"
           echo "================="
           for REPO in $REPOS; do
@@ -68,4 +68,5 @@ jobs:
       - name: notify Approvers
         run: |
           echo "stub todo:add reviewers"
+
 
