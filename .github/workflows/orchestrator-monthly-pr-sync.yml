@@ -66,6 +66,7 @@ jobs:
                 else
                   echo "PR exists (#$PR_EXISTS). Skipping."
                 fi
+              fi
             else
               echo "No improvement branch found for $REPO, skipping..."
               echo "Branch not found in $REPO."
