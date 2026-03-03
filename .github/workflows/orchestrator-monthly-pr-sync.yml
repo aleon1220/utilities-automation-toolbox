@@ -18,9 +18,9 @@ jobs:
         run: |
           # Using 'last month' logic. naming pattern e.g. 2026-01-january
           BASE_DATE=$(date -d "last month" +%Y-%m-%B)
-          YEAR=$(date -d "last month" +%Y)
-          MONTH_NUM=$(date -d "last month" +%m)
-          MONTH_NAME=$(date -d "last month" +%B | tr '[:upper:]' '[:lower:]')
+          YEAR=$(echo $BASE_DATE | cut -d'-' -f1)
+          MONTH_NUM=$(echo $BASE_DATE | cut -d'-' -f2)
+          MONTH_NAME=$(echo $BASE_DATE | cut -d'-' -f3 | tr '[:upper:]' '[:lower:]')
           echo "branch_pattern=${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements" >> $GITHUB_OUTPUT
 
       - name: Process GitHub Repositories
@@ -30,7 +30,7 @@ jobs:
           ORG_NAME: ${{ github.repository_owner }}
         run: |
           # 1. Get list of all non-archived repos in the org/account
-          REPOS=$(gh repo list $ORG_NAME --limit 1000 --json name --jq '.[].name')
+          REPOS=$(gh repo list $ORG_NAME --limit 1000 --no-archived --json name --jq '.[].name')
           echo "================= repos extracted"
 
           for REPO in $REPOS; do
