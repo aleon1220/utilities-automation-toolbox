@@ -42,22 +42,25 @@ jobs:
             # https://cli.github.com/manual/gh_api
             BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
             if [ "$BRANCH_GEN_AI" != "404" ]; then
-              echo "github Branch found! Checking for existing PRs..."
-              
-              # 3. Check if a PR already exists to avoid duplicates
-              PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
-              echo "================= Checked github PRs for $ORG_NAME/$REPO"
-              if [ -z "$PR_EXISTS" ]; then
-                # 4. Create PR to merge improvements branch into main
-                echo "================= Creating Monthly Pull Request for repository $REPO..."
+              # Check if branch has commits not in main
+              COMMITS_AHEAD=$(gh api repos/$ORG_NAME/$REPO/compare/main...$BRANCH_NAME --jq '.ahead_by' 2>/dev/null || echo "0")
+              if [ "$COMMITS_AHEAD" -gt 0 ]; then
+                echo "github Branch found! Checking for existing PRs..."
+                
+                # 3. Check if a PR already exists to avoid duplicates
+                PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
+                echo "================= Checked github PRs for $ORG_NAME/$REPO"
+                if [ -z "$PR_EXISTS" ]; then
+                  # 4. Create PR to merge improvements branch into main
+                  echo "================= Creating Monthly Pull Request for repository $REPO..."
 
-                gh pr create \
-                  --repo $ORG_NAME/$REPO \
-                  --base main \
-                  --head $BRANCH_NAME \
-                  --label "automated-pr" \
-                  --title "Monthly Improvements: $BRANCH_NAME" \
-                  --body "GitHub Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main."
+                  gh pr create \
+                    --repo $ORG_NAME/$REPO \
+                    --base main \
+                    --head $BRANCH_NAME \
+                    --label "automated-pr" \
+                    --title "Monthly Improvements: $BRANCH_NAME" \
+                    --body "GitHub Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main."
 
                   else
                 echo "PR exists (#$PR_EXISTS). Skipping."
