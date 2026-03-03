@@ -31,7 +31,6 @@ jobs:
           BRANCH_NAME: ${{ steps.vars.outputs.branch_pattern }}
           ORG_NAME: ${{ github.repository_owner }}
         run: |
-          echo "Searching for branch: $BRANCH_NAME" >> $GITHUB_OUTPUT
           # 1. Get list of all non-archived repos in the org/account
           REPOS=$(gh repo list $ORG_NAME --limit 1000 --json name --jq '.[].name')
           echo "================= repos extracted"
@@ -41,7 +40,8 @@ jobs:
             echo "================= Checking github repo $ORG_NAME/$REPO..."
             # https://cli.github.com/manual/gh_api
             BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
-            
+            echo "Searching for branch $BRANCH_NAME"
+
             if [ "$BRANCH_GEN_AI" != "404" ]; then
               # Check if branch has commits not in main
               COMMITS_AHEAD=$(gh api repos/$ORG_NAME/$REPO/compare/main...$BRANCH_NAME --jq '.ahead_by' 2>/dev/null || echo "0")
