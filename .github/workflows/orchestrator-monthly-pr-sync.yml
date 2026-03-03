@@ -79,6 +79,6 @@ jobs:
           GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}      
         run: gh api --verbose "repos/${GITHUB_REPOSITORY}/branches"
 
-      - name: notify Approvers
+      - name: code to streamline
         run: |
-          echo "stub todo:add reviewers"
+          echo "todo:add github action that reminds approvers if a PR is not been active > 2 business days"
