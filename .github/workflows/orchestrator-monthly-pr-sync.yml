@@ -1,5 +1,9 @@
 name: Monthly Branch Improvement Sync
 
+permissions:
+  contents: read
+  pull-requests: write
+
 on:
   schedule:
     # Runs at 00:00 on the 1st of every month to catch the previous month's branch
@@ -7,65 +11,69 @@ on:
   workflow_dispatch: # Allows manual testing
 
 jobs:
-  find-and-pr:
+  create-monthly-sync-prs:
     runs-on: ubuntu-latest
     steps:
       - name: Calculate Target Branch Name
         id: vars
         run: |
-          # Using 'last month' logic ensures we check the month that just ended
+          # Using 'last month' logic check the month that just ended
+          BASE_DATE=$(date -d "last month" +%Y-%m-%B)
           YEAR=$(date -d "last month" +%Y)
           MONTH_NUM=$(date -d "last month" +%m)
           MONTH_NAME=$(date -d "last month" +%B | tr '[:upper:]' '[:lower:]')
-          # previous month pattern e.g. 2026-01-january
+          # previous month branch naming pattern e.g. 2026-01-january
           echo "branch_pattern=${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements" >> $GITHUB_OUTPUT
           
       - name: Process GitHub Repositories
         env:
           GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
           BRANCH_NAME: ${{ steps.vars.outputs.branch_pattern }}
-          ORG_NAME: "aleon1220"
+          ORG_NAME: ${{ github.repository_owner }}
         run: |
-          echo "Searching for branch: $BRANCH_NAME"
-          BRANCH_EVALUATION=$(gh api "repos/$ORG_NAME/kiwiki/branches/$BRANCH_NAME" --verbose || echo "404" )
-          echo "=================***"
-          echo "debug output from API $BRANCH_EVALUATION "
-          echo "=================***"
+          echo "Searching for branch: $BRANCH_NAME" >> $GITHUB_OUTPUT
           # 1. Get list of all non-archived repos in the org/account
           REPOS=$(gh repo list $ORG_NAME --limit 1000 --json name --jq '.[].name')
-          echo "repos extracted"
-          echo "================="
+          echo "================= repos extracted"
+          
           for REPO in $REPOS; do
-            echo "Checking github repo $ORG_NAME/$REPO..."
-            
-            echo "================="
             # 2. Check if improvement branch exists based on naming pattern
+            echo "================= Checking github repo $ORG_NAME/$REPO..."
             # https://cli.github.com/manual/gh_api
-            echo "=================*** "
             BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
             if [ "$BRANCH_GEN_AI" != "404" ]; then
               echo "github Branch found! Checking for existing PRs..."
               
-              # Check if a PR already exists to avoid duplicates
+              # 3. Check if a PR already exists to avoid duplicates
               PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
-
+              echo "================= Checked github PRs for $ORG_NAME/$REPO"
               if [ -z "$PR_EXISTS" ]; then
+                # 4. Create PR to merge improvements branch into main
                 echo "Creating Monthly Pull Request for repository $REPO..."
                 gh pr create \
                   -R $ORG_NAME/$REPO \
                   -B main \
                   -H $BRANCH_NAME \
+                  --fill \
+                  --label "automated-pr" \
                   -t "Monthly Improvements: $BRANCH_NAME" \
                   -b "github Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main."
               else
                 echo "PR exists (#$PR_EXISTS). Skipping."
               fi
             else
-              echo "error in execution"
+              echo "No improvement branch found for $REPO, skipping..."
               echo "Branch not found in $REPO."
             fi
           done
           
+      - name: provide verbose output for debugging
+        run: |
+          BRANCH_EVALUATION=$(gh api --verbose "repos/$ORG_NAME/{repo}/branches"  || echo "404" )
+          echo "=================***"
+          echo "debug output from API $BRANCH_EVALUATION "
+          echo "================***"
+
       - name: notify Approvers
         run: |
           echo "stub todo:add reviewers"
