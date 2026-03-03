@@ -41,6 +41,7 @@ jobs:
             echo "================= Checking github repo $ORG_NAME/$REPO..."
             # https://cli.github.com/manual/gh_api
             BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
+            
             if [ "$BRANCH_GEN_AI" != "404" ]; then
               # Check if branch has commits not in main
               COMMITS_AHEAD=$(gh api repos/$ORG_NAME/$REPO/compare/main...$BRANCH_NAME --jq '.ahead_by' 2>/dev/null || echo "0")
@@ -62,8 +63,9 @@ jobs:
                     --title "Monthly Improvements: $BRANCH_NAME" \
                     --body "GitHub Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main."
 
-                  else
-                echo "PR exists (#$PR_EXISTS). Skipping."
+                  echo "================= PR created for $REPO."
+                else
+                  echo "PR exists (#$PR_EXISTS). Skipping."
               fi
             else
               echo "No improvement branch found for $REPO, skipping..."
