@@ -1,5 +1,4 @@
 name: Monthly Branch Improvement Sync
-
 permissions:
   contents: read
   pull-requests: write
@@ -17,12 +16,11 @@ jobs:
       - name: Calculate Target Branch Name
         id: vars
         run: |
-          # Using 'last month' logic check the month that just ended
+          # Using 'last month' logic. naming pattern e.g. 2026-01-january
           BASE_DATE=$(date -d "last month" +%Y-%m-%B)
           YEAR=$(date -d "last month" +%Y)
           MONTH_NUM=$(date -d "last month" +%m)
           MONTH_NAME=$(date -d "last month" +%B | tr '[:upper:]' '[:lower:]')
-          # previous month branch naming pattern e.g. 2026-01-january
           echo "branch_pattern=${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements" >> $GITHUB_OUTPUT
 
       - name: Process GitHub Repositories
@@ -63,7 +61,8 @@ jobs:
                     --head $BRANCH_NAME \
                     --label "automated-pr" \
                     --title "Monthly Improvements: $BRANCH_NAME" \
-                    --body "GitHub Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main."
+                    --body "GitHub Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main." \
+                    --reviewer "Matet17"
 
                   echo "================= PR created for $REPO."
                 else
@@ -76,10 +75,10 @@ jobs:
             fi
           done
 
-      - name: provide verbose output for debugging
-        run: |
-          BRANCH_EVALUATION=$(gh api --verbose "repos/$ORG_NAME/{repo}/branches"  || echo "404" )
-          echo ""================= debug output from API $BRANCH_EVALUATION "
+      - name: provide verbose output this repo debugging
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}      
+        run: gh api --verbose "repos/${GITHUB_REPOSITORY}/branches"
 
       - name: notify Approvers
         run: |
