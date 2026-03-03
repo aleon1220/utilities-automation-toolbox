@@ -51,6 +51,9 @@ jobs:
                 PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
                 echo "================= Checked github PRs for $ORG_NAME/$REPO"
                 if [ -z "$PR_EXISTS" ]; then
+                  # Ensure the label exists (create if missing)
+                  gh label create "automated-pr" --color "#ededed" --description "github Actions orchestrator Automated PRs" --repo $ORG_NAME/$REPO 2>/dev/null || true
+                  
                   # 4. Create PR to merge improvements branch into main
                   echo "================= Creating Monthly Pull Request for repository $REPO..."
 
