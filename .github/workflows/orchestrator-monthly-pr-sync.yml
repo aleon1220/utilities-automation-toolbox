@@ -49,16 +49,17 @@ jobs:
               echo "================= Checked github PRs for $ORG_NAME/$REPO"
               if [ -z "$PR_EXISTS" ]; then
                 # 4. Create PR to merge improvements branch into main
-                echo "Creating Monthly Pull Request for repository $REPO..."
+                echo "================= Creating Monthly Pull Request for repository $REPO..."
+
                 gh pr create \
-                  -R $ORG_NAME/$REPO \
-                  -B main \
-                  -H $BRANCH_NAME \
-                  --fill \
+                  --repo $ORG_NAME/$REPO \
+                  --base main \
+                  --head $BRANCH_NAME \
                   --label "automated-pr" \
-                  -t "Monthly Improvements: $BRANCH_NAME" \
-                  -b "github Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main."
-              else
+                  --title "Monthly Improvements: $BRANCH_NAME" \
+                  --body "GitHub Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main."
+
+                  else
                 echo "PR exists (#$PR_EXISTS). Skipping."
               fi
             else
