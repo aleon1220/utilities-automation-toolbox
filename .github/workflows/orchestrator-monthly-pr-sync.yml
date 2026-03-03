@@ -71,7 +71,6 @@ jobs:
               fi
             else
               echo "No improvement branch found for $REPO, skipping..."
-              echo "Branch not found in $REPO."
             fi
           done
 
