@@ -8,9 +8,12 @@
 
 plugins {
     // Apply the java-library plugin for API and implementation separation.
-    `java-library`
+    id("java-library")
     java
     application
+    // id("com.github.johnrengelman.shadow") version "8.3.0"
+    // https://plugins.gradle.org/plugin/com.gradleup.shadow
+    id("com.gradleup.shadow") version "9.3.2"
 }
 
 application {
@@ -25,10 +28,10 @@ repositories {
 dependencies {
     // This dependency is exported to consumers, that is to say found on their compile classpath.
     api(libs.commons.math3)
-
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
     implementation(libs.guava)
     implementation ("info.picocli:picocli:4.7.5")
+    annotationProcessor("info.picocli:picocli-codegen:4.7.5")
     testImplementation ("junit:junit:4.13.2")    
 }
 
