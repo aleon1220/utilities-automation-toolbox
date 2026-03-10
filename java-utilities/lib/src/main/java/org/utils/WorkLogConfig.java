@@ -36,28 +36,25 @@ import picocli.CommandLine.Option;
 @Command(name = "worklog", description = "Work log configuration tool")
 public class WorkLogConfig implements Runnable {
     public static final String helpAppJavaUtils = """
-    %n
     Help General Usage example:
       java -jar appJavaUtils-all.jar --start "2026-01-01" --end "2026-01-11"
     """;
 
-    @Option(names = { "-s", "--start" }, description = "Start date business day")
+    @Option(names = { "-s", "--start" }, description = "Start date business day%nFormat: yyyy-MM-dd")
     Optional<LocalDate> startDate = Optional.empty();
 
-    @Option(names = { "-e", "--end" }, description = "End date business day")
+    @Option(names = { "-e", "--end" }, description = "End date business day%nFormat: yyyy-MM-dd")
     Optional<LocalDate> endDate = Optional.empty();
 
     @Option(names = { "-h", "--help" }, usageHelp = true, description = helpAppJavaUtils)
     boolean help;
 
-
-
     // markdown templates
     public static String markdownWorkLogDayStructure = """
             ## GOALS
             1. Main Planning System
-            2. [Trello](https://trello.com/c/63qYHZ9V)
-            3. ART planning system
+            2. [Trello Kanban](https://trello.com/b/UTAdvGqO/0-kanban-doing-year-planner)
+            3. Client planning system todo:refine-process
 
             ## QUESTIONS
             1. ?
