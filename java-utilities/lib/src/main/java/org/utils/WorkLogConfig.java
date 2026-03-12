@@ -21,7 +21,6 @@ import static java.time.Month.JULY;
 import static java.time.Month.OCTOBER;
 import static java.time.Month.DECEMBER;
 import java.time.temporal.IsoFields;
-import java.time.LocalDate;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
 
@@ -36,22 +35,26 @@ import picocli.CommandLine.Option;
 // The @CommandLineSchema annotation tells the JVM how to map args to this record
 @Command(name = "worklog", description = "Work log configuration tool")
 public class WorkLogConfig implements Runnable {
+    public static final String helpAppJavaUtils = """
+    Help General Usage example:
+      java -jar appJavaUtils-all.jar --start "2026-01-01" --end "2026-01-11"
+    """;
 
-    @Option(names = { "-s", "--start" }, description = "Start date")
+    @Option(names = { "-s", "--start" }, description = "Start date business day%nFormat: yyyy-MM-dd")
     Optional<LocalDate> startDate = Optional.empty();
 
-    @Option(names = { "-e", "--end" }, description = "End date")
+    @Option(names = { "-e", "--end" }, description = "End date business day%nFormat: yyyy-MM-dd")
     Optional<LocalDate> endDate = Optional.empty();
 
-    @Option(names = { "-h", "--help" }, usageHelp = true, description = "Display this help message")
+    @Option(names = { "-h", "--help" }, usageHelp = true, description = helpAppJavaUtils)
     boolean help;
 
     // markdown templates
     public static String markdownWorkLogDayStructure = """
             ## GOALS
             1. Main Planning System
-            2. [Trello](https://trello.com/c/63qYHZ9V)
-            3. ART planning system
+            2. [Trello Kanban](https://trello.com/b/UTAdvGqO/0-kanban-doing-year-planner)
+            3. Client planning system todo:refine-process
 
             ## QUESTIONS
             1. ?
@@ -84,18 +87,18 @@ public class WorkLogConfig implements Runnable {
             - NZ_Timesheet_Code
             """;
 
-    static LocalDate endOfMonth = LocalDate.now().withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
+    static LocalDate endOfMonth = LocalDate.now()
+            .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
 
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
-        entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
-        entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
-        entry(LocalDate.of(2026, APRIL, 13), "Easter Monday"),
-        entry(LocalDate.of(2026, APRIL, 25), "ANZAC Day"),
-        entry(LocalDate.of(2026, JUNE, 1), "Queen's Birthday"),
-        entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
-        entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
-        entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day")
-    );
+            entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
+            entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
+            entry(LocalDate.of(2026, APRIL, 13), "Easter Monday"),
+            entry(LocalDate.of(2026, APRIL, 25), "ANZAC Day"),
+            entry(LocalDate.of(2026, JUNE, 1), "Queen's Birthday"),
+            entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
+            entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
+            entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day"));
 
     static final Map<LocalDate, String> nzHolidays2025 = HOLIDAYS_2026;
 
@@ -106,8 +109,6 @@ public class WorkLogConfig implements Runnable {
             2.
             3.
             """;
-
-
 
     private static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
