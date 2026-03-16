@@ -211,7 +211,7 @@ public class WorkLogConfig implements Runnable {
         });
 
         System.out.println("Total: " + sortedHolidays.size() + " National Holidays");
-        System.out.println("----------------------------------------------%n");
+        System.out.printf("----------------------------------------------%n");
     }
 
     static void printDaysUntilEndofMonth(LocalDate date) {
@@ -244,7 +244,7 @@ public class WorkLogConfig implements Runnable {
         }
 
         System.out.printf("  %n%n%-40s | %s%n", formatDateForFileName(date), date.getDayOfWeek());
-        System.out.println("----------------------------------------------%n");
+        System.out.printf("----------------------------------------------%n");
     }
 
     static boolean isValidDateRange(LocalDate start, LocalDate end) {
