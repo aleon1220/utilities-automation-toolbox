@@ -78,10 +78,11 @@ public class WorkLogConfig implements Runnable {
             2. todo
 
             ### Day Reflection & Learning
-            1. todo
+            1. todo_add_reflection
+            2. todo_add_learning
 
             ### Timesheet submission
-            - NZ_Timesheet_Code
+            - NZ_Timesheet_Code todo_add
             """;
 
     static LocalDate endOfMonth = LocalDate.now().withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
