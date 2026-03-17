@@ -176,7 +176,7 @@ public class WorkLogConfig implements Runnable {
         return true;
     } // end of validateDateRange()
 
-    static boolean isValidDateRange(LocalDate start, LocalDate end) {
+    public static boolean isValidDateRange(LocalDate start, LocalDate end) {
         var result = performDateValidation(start, end);
         if (result.hasError()) {
             System.out.println("======= " + result.errorMessage());
