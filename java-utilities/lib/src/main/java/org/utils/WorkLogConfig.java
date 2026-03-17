@@ -26,7 +26,6 @@ import java.time.temporal.WeekFields;
 import java.util.Locale;
 
 import static java.util.Map.entry;
-import java.time.LocalDate;
 import java.util.Optional;
 
 import picocli.CommandLine;
@@ -51,7 +50,7 @@ public class WorkLogConfig implements Runnable {
             ## GOALS
             1. Main Planning System
             2. [Trello](https://trello.com/c/63qYHZ9V)
-            3. ART planning system
+            3. Client planning system
 
             ## QUESTIONS
             1. ?
@@ -85,18 +84,18 @@ public class WorkLogConfig implements Runnable {
             - NZ_Timesheet_Code todo_add
             """;
 
-    static LocalDate endOfMonth = LocalDate.now().withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
+    static LocalDate endOfMonth = LocalDate.now()
+            .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
 
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
-        entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
-        entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
-        entry(LocalDate.of(2026, APRIL, 13), "Easter Monday"),
-        entry(LocalDate.of(2026, APRIL, 25), "ANZAC Day"),
-        entry(LocalDate.of(2026, JUNE, 1), "Queen's Birthday"),
-        entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
-        entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
-        entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day")
-    );
+            entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
+            entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
+            entry(LocalDate.of(2026, APRIL, 13), "Easter Monday"),
+            entry(LocalDate.of(2026, APRIL, 25), "ANZAC Day"),
+            entry(LocalDate.of(2026, JUNE, 1), "Queen's Birthday"),
+            entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
+            entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
+            entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day"));
 
     static final Map<LocalDate, String> nzHolidays2025 = HOLIDAYS_2026;
 
@@ -107,8 +106,6 @@ public class WorkLogConfig implements Runnable {
             2.
             3.
             """;
-
-
 
     private static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
@@ -122,7 +119,7 @@ public class WorkLogConfig implements Runnable {
     }
 
     void createMarkdownFiles() {
-        if (!startDate.isPresent() || !endDate.isPresent()) {
+        if (startDate.isEmpty() || endDate.isEmpty()) {
             System.out.println("Start and end dates are required");
             return;
         }
@@ -131,9 +128,11 @@ public class WorkLogConfig implements Runnable {
             return;
         }
 
+        Path outputDir = resolveOutputDirectory();
+
         try {
             for (LocalDate date = startDate.get(); !date.isAfter(endDate.get()); date = date.plusDays(1)) {
-                // Logic fixed: Skip if it IS a weekend OR if it IS a holiday
+
                 if (isWeekend(date)) {
                     System.out.println("Skipping Weekend for " + formatDateForFileName(date));
                     continue;
@@ -144,13 +143,15 @@ public class WorkLogConfig implements Runnable {
                     continue;
                 }
 
-                String fileName = formatDateForFileName(date).concat(".md");
-                String titleWorkLogDay = createTitleForWorkLog(date);
-                Path filePath = Path.of(fileName);
-                Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
+                String fileName = formatDateForFileName(date) + ".md";
+                Path filePath = outputDir.resolve(fileName);
+
+                String title = createTitleForWorkLog(date);
+                Files.writeString(filePath, title + markdownWorkLogDayStructure);
 
                 if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
+                    try (BufferedWriter writer = Files.newBufferedWriter(filePath,
+                            java.nio.file.StandardOpenOption.APPEND)) {
                         writer.write(textFridayTemplate);
                     }
                 }
@@ -302,5 +303,19 @@ public class WorkLogConfig implements Runnable {
     public static void main(String[] args) {
         int exitCode = new CommandLine(new WorkLogConfig()).execute(args);
         System.exit(exitCode);
+    }
+
+    private static Path resolveOutputDirectory() {
+        String base = "/mnt/c/workspace/TESTS";
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        Path dir = Path.of(base, today);
+
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to create output directory: " + dir, e);
+        }
+
+        return dir;
     }
 }
