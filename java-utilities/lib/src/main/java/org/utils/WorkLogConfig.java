@@ -10,20 +10,13 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
 
 import static java.time.Month.JANUARY;
 import static java.time.Month.FEBRUARY;
 import static java.time.Month.APRIL;
 import static java.time.Month.JUNE;
-import static java.time.Month.JULY;
 import static java.time.Month.OCTOBER;
 import static java.time.Month.DECEMBER;
-import java.time.temporal.IsoFields;
-import java.time.LocalDate;
-import java.time.temporal.WeekFields;
-import java.util.Locale;
 
 import static java.util.Map.entry;
 import java.util.Optional;
@@ -84,9 +77,6 @@ public class WorkLogConfig implements Runnable {
             - NZ_Timesheet_Code todo_add
             """;
 
-    static LocalDate endOfMonth = LocalDate.now()
-            .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
-
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
             entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
@@ -97,8 +87,6 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
             entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day"));
 
-    static final Map<LocalDate, String> nzHolidays2025 = HOLIDAYS_2026;
-
     static String textFridayTemplate = """
 
             ## End of week Reflection | Learning & Next Goals
@@ -107,7 +95,7 @@ public class WorkLogConfig implements Runnable {
             3.
             """;
 
-    private static String formatDateForFileName(LocalDate date) {
+    static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
         return formatter.format(date);
     }
@@ -162,13 +150,6 @@ public class WorkLogConfig implements Runnable {
         }
     }
 
-    public static void printDataStructures() {
-        System.out.println("======= Print details using using Java 25!");
-        System.out.println("======= Map Class Type " + nzHolidays2025.getClass());
-        System.out.println("======= NZ Holidays 2025 - Contents");
-        System.out.println(nzHolidays2025);
-    }
-
     public static void addContentToMarkdownFile() {
         var overrideMarkdownFile = "C:\\ws\\04\\2025-04-30-Wednesday.md";
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFile, true))) {
@@ -194,59 +175,6 @@ public class WorkLogConfig implements Runnable {
         }
         return true;
     } // end of validateDateRange()
-
-    public static void printHolidays() {
-        Map<LocalDate, String> holidayMap = HOLIDAYS_2026;
-        // Use TreeMap to sort by date automatically
-        var sortedHolidays = new TreeMap<>(holidayMap);
-        var formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy");
-
-        System.out.println("==============================================");
-        System.out.println("     NEW ZEALAND PUBLIC HOLIDAYS 2026         ");
-        System.out.println("==============================================");
-        System.out.printf("%-20s | %-20s%n", "DATE", "HOLIDAY NAME");
-        System.out.println("----------------------------------------------");
-
-        sortedHolidays.forEach((date, name) -> {
-            System.out.printf("%-20s | %-20s%n", date.format(formatter), name);
-        });
-
-        System.out.println("Total: " + sortedHolidays.size() + " National Holidays");
-        System.out.printf("----------------------------------------------%n");
-    }
-
-    static void printDaysUntilEndofMonth(LocalDate date) {
-
-        long daysUntilEndOfMonth = ChronoUnit.DAYS.between(date, endOfMonth);
-        int weekNumber = date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
-        System.out.println("======= Printing info until End of Month =======");
-        System.out.println("======= " + daysUntilEndOfMonth +
-                " Days from today until end of Month from " + formatDateForFileName(date));
-        System.out.println("======= Current Week Number " + weekNumber);
-        System.out.println("======= " + String.format("%s ", daysUntilEndOfMonth) + " Days until end of Month");
-        System.out.println("======= Finishing month of " + date.getMonth() + " Total remaining Days "
-                + daysUntilEndOfMonth);
-
-        System.out.println("======= Listing remaining days until end of month");
-        int lastWeek = -1;
-        // WeekFields weekFields = WeekFields.ISO; // ISO standard for week numbering
-        WeekFields weekFields = WeekFields.of(Locale.of("en", "NZ"));
-        // WeekFields weekFields = WeekFields.of(Locale.of("en", "UK"));
-
-        for (LocalDate current = date; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
-            int currentWeek = current.get(weekFields.weekOfWeekBasedYear());
-
-            if (currentWeek != lastWeek) {
-                System.out.printf("%n======= Header for a new week =======");
-                System.out.printf("%n Week Number %d%n", currentWeek);
-                lastWeek = currentWeek;
-            }
-            System.out.println(createTitleForWorkLog(current));
-        }
-
-        System.out.printf("  %n%n%-40s | %s%n", formatDateForFileName(date), date.getDayOfWeek());
-        System.out.printf("----------------------------------------------%n");
-    }
 
     static boolean isValidDateRange(LocalDate start, LocalDate end) {
         var result = performDateValidation(start, end);
@@ -292,12 +220,9 @@ public class WorkLogConfig implements Runnable {
 
     @Override
     public void run() {
-        printHolidays();
-        printDaysUntilEndofMonth(LocalDate.now());
         if (startDate.isPresent() && endDate.isPresent()) {
             createMarkdownFiles();
         }
-        printDataStructures();
     }
 
     public static void main(String[] args) {
@@ -318,4 +243,4 @@ public class WorkLogConfig implements Runnable {
 
         return dir;
     }
-}
+} // end of Class
