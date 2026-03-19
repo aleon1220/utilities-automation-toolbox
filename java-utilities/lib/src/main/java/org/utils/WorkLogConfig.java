@@ -240,7 +240,6 @@ public class WorkLogConfig implements Runnable {
         } catch (IOException e) {
             throw new IllegalStateException("Unable to create output directory: " + dir, e);
         }
-
         return dir;
     }
 } // end of Class

@@ -36,13 +36,9 @@ Example:
 
 * Inserts a **title header** for the date.
 * Inserts the **daily worklog markdown template**.
-* If the date falls on a **Friday**, the tool appends an additional:
-* “End of week Reflection | Learning & Next Goals” section.
-
-### **Days Automatically Skipped**
-
-* Weekends (Saturday & Sunday)
-* New Zealand Public Holidays (hardcoded for 2026)
+* When date falls on a **Friday**, the tool appends an additional: section *Reflection, Learning & Next Goals*
+* skips Weekends (Saturday & Sunday)
+* skips New Zealand Public Holidays (hardcoded for 2026)
 
 ***
 
