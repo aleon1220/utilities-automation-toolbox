@@ -28,7 +28,7 @@ import picocli.CommandLine.Option;
 // The @CommandLineSchema annotation tells the JVM how to map args to this record
 @Command(name = "worklog", description = "Work log configuration tool")
 public class WorkLogConfig implements Runnable {
-
+// todo: order of commands and sorting
     @Option(names = { "-s", "--start" }, description = "Start date")
     Optional<LocalDate> startDate = Optional.empty();
 
@@ -39,6 +39,7 @@ public class WorkLogConfig implements Runnable {
     boolean help;
 
     // markdown templates
+    // todo: move to separate class or file if they get more complex to simplify
     public static String markdownWorkLogDayStructure = """
             ## GOALS
             1. Main Planning System
@@ -77,6 +78,7 @@ public class WorkLogConfig implements Runnable {
             - NZ_Timesheet_Code todo_add
             """;
 
+    // todo: add more holidays, and move to separate class or file if they get more complex to simplify
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
             entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
@@ -94,7 +96,8 @@ public class WorkLogConfig implements Runnable {
             2.
             3.
             """;
-
+    
+    // todo: the file name and title should be the same call
     static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
         return formatter.format(date);
@@ -150,6 +153,7 @@ public class WorkLogConfig implements Runnable {
         }
     }
 
+    // todo: this method is an attempt to append content. Simplify and generalise
     public static void addContentToMarkdownFile() {
         var overrideMarkdownFile = "C:\\ws\\04\\2025-04-30-Wednesday.md";
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFile, true))) {
@@ -217,7 +221,8 @@ public class WorkLogConfig implements Runnable {
             default -> false;
         };
     }
-
+    
+    // todo: understand this override
     @Override
     public void run() {
         if (startDate.isPresent() && endDate.isPresent()) {
@@ -230,6 +235,7 @@ public class WorkLogConfig implements Runnable {
         System.exit(exitCode);
     }
 
+    // todo: add some prints that show the output directory and file names being created for better visibility and debugging
     private static Path resolveOutputDirectory() {
         String base = "/mnt/c/workspace/TESTS";
         String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);

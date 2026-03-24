@@ -11,6 +11,7 @@ plugins {
     `java-library`
     java
     application
+    id("com.gradleup.shadow") version "9.3.2"
 }
 
 application {
@@ -25,7 +26,6 @@ repositories {
 dependencies {
     // This dependency is exported to consumers, that is to say found on their compile classpath.
     api(libs.commons.math3)
-
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
     implementation(libs.guava)
     implementation ("info.picocli:picocli:4.7.5")
