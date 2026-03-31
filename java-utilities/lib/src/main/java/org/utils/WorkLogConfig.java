@@ -26,16 +26,20 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 // The @CommandLineSchema annotation tells the JVM how to map args to this record
-@Command(name = "worklog", description = "Work log configuration tool")
+@Command(name = "worklog", description = "Work log configuration tool", footer = {
+        "%nExample: create logs March 2026",
+        "   worklog --start 2026-03-01 --end 2026-03-31",
+        "   worklog -s 2026-03-01 -e 2026-03-31"
+})
+
 public class WorkLogConfig implements Runnable {
-// todo: order of commands and sorting
     @Option(names = { "-s", "--start" }, description = "Start date")
     Optional<LocalDate> startDate = Optional.empty();
 
     @Option(names = { "-e", "--end" }, description = "End date")
     Optional<LocalDate> endDate = Optional.empty();
 
-    @Option(names = { "-h", "--help" }, usageHelp = true, description = "Display this help message")
+    @Option(names = { "-h", "--help" }, usageHelp = true, description = "help")
     boolean help;
 
     // markdown templates
@@ -54,9 +58,7 @@ public class WorkLogConfig implements Runnable {
             ### Daily Standup
             1. ✅ What was done yesterday
               - **todo_done**
-              - **todo_done**
             2. 🔄 What is planned for today
-              - **todo_planned**
               - **todo_planned**
             3. ❗ blockers & escalations
               - **todo_blocker**
@@ -78,7 +80,8 @@ public class WorkLogConfig implements Runnable {
             - NZ_Timesheet_Code todo_add
             """;
 
-    // todo: add more holidays, and move to separate class or file if they get more complex to simplify
+    // todo: add more holidays, and move to separate class or file if they get more
+    // complex to simplify
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
             entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
@@ -96,7 +99,7 @@ public class WorkLogConfig implements Runnable {
             2.
             3.
             """;
-    
+
     // todo: the file name and title should be the same call
     static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
@@ -221,7 +224,7 @@ public class WorkLogConfig implements Runnable {
             default -> false;
         };
     }
-    
+
     // todo: understand this override
     @Override
     public void run() {
@@ -235,7 +238,8 @@ public class WorkLogConfig implements Runnable {
         System.exit(exitCode);
     }
 
-    // todo: add some prints that show the output directory and file names being created for better visibility and debugging
+    // todo: add some prints that show the output directory and file names being
+    // created for better visibility and debugging
     private static Path resolveOutputDirectory() {
         String base = "/mnt/c/workspace/TESTS";
         String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
