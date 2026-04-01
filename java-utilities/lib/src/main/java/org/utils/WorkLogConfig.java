@@ -10,14 +10,11 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
 
 import static java.time.Month.JANUARY;
 import static java.time.Month.FEBRUARY;
 import static java.time.Month.APRIL;
 import static java.time.Month.JUNE;
-import static java.time.Month.JULY;
 import static java.time.Month.OCTOBER;
 import static java.time.Month.DECEMBER;
 import java.time.temporal.IsoFields;
@@ -25,7 +22,6 @@ import java.time.temporal.WeekFields;
 import java.util.Locale;
 
 import static java.util.Map.entry;
-import java.time.LocalDate;
 import java.util.Optional;
 
 import picocli.CommandLine;
@@ -33,43 +29,43 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 // The @CommandLineSchema annotation tells the JVM how to map args to this record
-@Command(name = "worklog", description = "Work log configuration tool")
-public class WorkLogConfig implements Runnable {
-    public static final String helpAppJavaUtils = """
-    Help General Usage example:
-      java -jar appJavaUtils-all.jar --start "2026-01-01" --end "2026-01-11"
-    """;
+@Command(name = "worklog", description = "%nWork log markdown file creator tool%n", footer = {
+        "%nExample: create logs March 2026",
+        "   worklog --start 2026-03-01 --end 2026-03-31",
+        "   worklog -s 2026-03-01 -e 2026-03-31"
+}, sortOptions = false, requiredOptionMarker = '*', showDefaultValues = true)
 
-    @Option(names = { "-s", "--start" }, description = "Start date business day%nFormat: yyyy-MM-dd")
+public class WorkLogConfig implements Runnable {
+    @Option(names = { "-s", "--start" }, description = "Start date YYYY-MM-DD", required = true)
     Optional<LocalDate> startDate = Optional.empty();
 
-    @Option(names = { "-e", "--end" }, description = "End date business day%nFormat: yyyy-MM-dd")
+    @Option(names = { "-e", "--end" }, description = "End date", required = true)
     Optional<LocalDate> endDate = Optional.empty();
 
-    @Option(names = { "-h", "--help" }, usageHelp = true, description = helpAppJavaUtils)
+    @Option(names = { "-h", "--help" }, usageHelp = true, description = "worklog Show this help message and exit")
     boolean help;
 
     // markdown templates
+    // todo: move to separate class or file if they get more complex to simplify
     public static String markdownWorkLogDayStructure = """
             ## GOALS
+            
             1. Main Planning System
-            2. [Trello Kanban](https://trello.com/b/UTAdvGqO/0-kanban-doing-year-planner)
-            3. Client planning system todo:refine-process
+            2. [Trello](https://trello.com/c/63qYHZ9V)
+            3. Client planning system
 
             ## QUESTIONS
-            1. ?
+            1. todo_add_question?
 
             ## MORNING
 
             ### Daily Standup
             1. ✅ What was done yesterday
               - **todo_done**
-              - **todo_done**
             2. 🔄 What is planned for today
               - **todo_planned**
-              - **todo_planned**
             3. ❗ blockers & escalations
-              - **todo_blocker**
+              - **todo_add_blocker**
 
             ## AFTERNOON
             ### TODO_activity_name
@@ -81,12 +77,16 @@ public class WorkLogConfig implements Runnable {
             2. todo
 
             ### Day Reflection & Learning
-            1. todo
+            1. todo_add_reflection
+            2. todo_add_learning
 
             ### Timesheet submission
-            - NZ_Timesheet_Code
+            - NZ_Timesheet_Code todo_add
+            
             """;
 
+    // todo: add more holidays, and move to separate class or file if they get more
+    // complex to simplify
     static LocalDate endOfMonth = LocalDate.now()
             .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
 
@@ -100,8 +100,6 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
             entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day"));
 
-    static final Map<LocalDate, String> nzHolidays2025 = HOLIDAYS_2026;
-
     static String textFridayTemplate = """
 
             ## End of week Reflection | Learning & Next Goals
@@ -110,6 +108,8 @@ public class WorkLogConfig implements Runnable {
             3.
             """;
 
+    // todo: the file name and title should be the same call
+    static String formatDateForFileName(LocalDate date) {
     private static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
         return formatter.format(date);
@@ -122,7 +122,7 @@ public class WorkLogConfig implements Runnable {
     }
 
     void createMarkdownFiles() {
-        if (!startDate.isPresent() || !endDate.isPresent()) {
+        if (startDate.isEmpty() || endDate.isEmpty()) {
             System.out.println("Start and end dates are required");
             return;
         }
@@ -131,9 +131,11 @@ public class WorkLogConfig implements Runnable {
             return;
         }
 
+        Path outputDir = resolveOutputDirectory();
+
         try {
             for (LocalDate date = startDate.get(); !date.isAfter(endDate.get()); date = date.plusDays(1)) {
-                // Logic fixed: Skip if it IS a weekend OR if it IS a holiday
+
                 if (isWeekend(date)) {
                     System.out.println("Skipping Weekend for " + formatDateForFileName(date));
                     continue;
@@ -144,13 +146,15 @@ public class WorkLogConfig implements Runnable {
                     continue;
                 }
 
-                String fileName = formatDateForFileName(date).concat(".md");
-                String titleWorkLogDay = createTitleForWorkLog(date);
-                Path filePath = Path.of(fileName);
-                Files.writeString(filePath, titleWorkLogDay.concat(markdownWorkLogDayStructure));
+                String fileName = formatDateForFileName(date) + ".md";
+                Path filePath = outputDir.resolve(fileName);
+
+                String title = createTitleForWorkLog(date);
+                Files.writeString(filePath, title + markdownWorkLogDayStructure);
 
                 if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
+                    try (BufferedWriter writer = Files.newBufferedWriter(filePath,
+                            java.nio.file.StandardOpenOption.APPEND)) {
                         writer.write(textFridayTemplate);
                     }
                 }
@@ -161,13 +165,7 @@ public class WorkLogConfig implements Runnable {
         }
     }
 
-    public static void printDataStructures() {
-        System.out.println("======= Print details using using Java 25!");
-        System.out.println("======= Map Class Type " + nzHolidays2025.getClass());
-        System.out.println("======= NZ Holidays 2025 - Contents");
-        System.out.println(nzHolidays2025);
-    }
-
+    // todo: this method is an attempt to append content. Simplify and generalise
     public static void addContentToMarkdownFile() {
         var overrideMarkdownFile = "C:\\ws\\04\\2025-04-30-Wednesday.md";
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFile, true))) {
@@ -194,60 +192,7 @@ public class WorkLogConfig implements Runnable {
         return true;
     } // end of validateDateRange()
 
-    public static void printHolidays() {
-        Map<LocalDate, String> holidayMap = HOLIDAYS_2026;
-        // Use TreeMap to sort by date automatically
-        var sortedHolidays = new TreeMap<>(holidayMap);
-        var formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy");
-
-        System.out.println("==============================================");
-        System.out.println("     NEW ZEALAND PUBLIC HOLIDAYS 2026         ");
-        System.out.println("==============================================");
-        System.out.printf("%-20s | %-20s%n", "DATE", "HOLIDAY NAME");
-        System.out.println("----------------------------------------------");
-
-        sortedHolidays.forEach((date, name) -> {
-            System.out.printf("%-20s | %-20s%n", date.format(formatter), name);
-        });
-
-        System.out.println("Total: " + sortedHolidays.size() + " National Holidays");
-        System.out.println("----------------------------------------------%n");
-    }
-
-    static void printDaysUntilEndofMonth(LocalDate date) {
-
-        long daysUntilEndOfMonth = ChronoUnit.DAYS.between(date, endOfMonth);
-        int weekNumber = date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
-        System.out.println("======= Printing info until End of Month =======");
-        System.out.println("======= " + daysUntilEndOfMonth +
-                " Days from today until end of Month from " + formatDateForFileName(date));
-        System.out.println("======= Current Week Number " + weekNumber);
-        System.out.println("======= " + String.format("%s ", daysUntilEndOfMonth) + " Days until end of Month");
-        System.out.println("======= Finishing month of " + date.getMonth() + " Total remaining Days "
-                + daysUntilEndOfMonth);
-
-        System.out.println("======= Listing remaining days until end of month");
-        int lastWeek = -1;
-        // WeekFields weekFields = WeekFields.ISO; // ISO standard for week numbering
-        WeekFields weekFields = WeekFields.of(Locale.of("en", "NZ"));
-        // WeekFields weekFields = WeekFields.of(Locale.of("en", "UK"));
-
-        for (LocalDate current = date; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
-            int currentWeek = current.get(weekFields.weekOfWeekBasedYear());
-
-            if (currentWeek != lastWeek) {
-                System.out.printf("%n======= Header for a new week =======");
-                System.out.printf("%n Week Number %d%n", currentWeek);
-                lastWeek = currentWeek;
-            }
-            System.out.println(createTitleForWorkLog(current));
-        }
-
-        System.out.printf("  %n%n%-40s | %s%n", formatDateForFileName(date), date.getDayOfWeek());
-        System.out.println("----------------------------------------------%n");
-    }
-
-    static boolean isValidDateRange(LocalDate start, LocalDate end) {
+    public static boolean isValidDateRange(LocalDate start, LocalDate end) {
         var result = performDateValidation(start, end);
         if (result.hasError()) {
             System.out.println("======= " + result.errorMessage());
@@ -289,18 +234,31 @@ public class WorkLogConfig implements Runnable {
         };
     }
 
+    // todo: understand this override
     @Override
     public void run() {
-        printHolidays();
-        printDaysUntilEndofMonth(LocalDate.now());
         if (startDate.isPresent() && endDate.isPresent()) {
             createMarkdownFiles();
         }
-        printDataStructures();
     }
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new WorkLogConfig()).execute(args);
         System.exit(exitCode);
     }
-}
+
+    // todo: add some prints that show the output directory and file names being
+    // created for better visibility and debugging
+    private static Path resolveOutputDirectory() {
+        String base = "/mnt/c/workspace/TESTS";
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        Path dir = Path.of(base, today);
+
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to create output directory: " + dir, e);
+        }
+        return dir;
+    }
+} // end of Class
