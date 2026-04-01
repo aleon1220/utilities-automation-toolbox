@@ -53,7 +53,7 @@ jobs:
                   gh label create "automated-pr" --color "#ededed" --description "GitHub Actions Automated PRs" --repo $ORG_NAME/$REPO 2>/dev/null || true
                   
                   # Grant reviewer read access (requires ORG_LEVEL_TOKEN to have admin rights on the repo)
-                  echo "Assigning pull permissions to reviewer..."
+                  echo "================= Assigning pull permissions to reviewer..."
                   gh api --method PUT \
                     -H "Accept: application/vnd.github+json" \
                     -H "X-GitHub-Api-Version: 2026-03-10" \
@@ -61,7 +61,7 @@ jobs:
                     -f permission=pull --silent
                   
                   # 4. Create PR to merge improvements branch into main
-                  echo "Creating Monthly Pull Request for $REPO..."
+                  echo "================= Creating Monthly Pull Request for $REPO..."
                   gh pr create \
                     --repo $ORG_NAME/$REPO \
                     --base main \
@@ -73,13 +73,13 @@ jobs:
 
                   echo "================= PR created for $REPO."
                 else
-                  echo "PR exists (#$PR_EXISTS). Skipping."
+                  echo "================= PR exists (#$PR_EXISTS). Skipping."
                 fi
               else
-                 echo "Branch exists but has no new commits ahead of main. Skipping PR creation."
+                 echo "================= Branch exists but has no new commits ahead of main. Skipping PR creation."
               fi
             else
-              echo "No improvement branch found for $REPO, skipping..."
+              echo "================= No improvement branch found for $REPO, skipping..."
             fi
           done
 
@@ -87,5 +87,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}      
         run: | 
+          echo "================= online docs https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10"
+          echo "================= smoke test verbose api call to list branches in this repo"
           gh api --verbose "repos/${GITHUB_REPOSITORY}/branches"
-          echo "online docs https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10"
+          
