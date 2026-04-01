@@ -1,0 +1,150 @@
+name: Add Collaborators to Repositories
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      collaborator_type:
+        description: 'Type of collaborator (user or team)'
+        required: true
+        default: 'user'
+        type: choice
+        options:
+          - user
+          - team
+      collaborator_name:
+        description: 'GitHub username or team name'
+        required: true
+        type: string
+      target_repos:
+        description: 'Target scope (all repos or specific repo)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - specific
+      specific_repo:
+        description: 'Specific repository name (only if target_repos is "specific")'
+        required: false
+        type: string
+      permission:
+        description: 'Permission level (pull, push, admin, maintain, triage)'
+        required: true
+        default: 'push'
+        type: choice
+        options:
+          - pull
+          - push
+          - admin
+          - maintain
+          - triage
+
+jobs:
+  add-collaborators:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Inputs
+        run: |
+          if [ "${{ inputs.target_repos }}" = "specific" ] && [ -z "${{ inputs.specific_repo }}" ]; then
+            echo "ERROR: specific_repo is required when target_repos is 'specific'"
+            exit 1
+          fi
+          echo "✓ Input validation passed"
+
+      - name: Add Collaborator to All Repos
+        if: inputs.target_repos == 'all'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
+          COLLABORATOR: ${{ inputs.collaborator_name }}
+          COLLABORATOR_TYPE: ${{ inputs.collaborator_type }}
+          PERMISSION: ${{ inputs.permission }}
+          ORG_NAME: ${{ github.repository_owner }}
+        run: |
+          echo "================= Getting all repositories in $ORG_NAME"
+          REPOS=$(gh repo list $ORG_NAME --limit 1000 --no-archived --json name --jq '.[].name')
+          
+          TOTAL=$(echo "$REPOS" | wc -l)
+          SUCCESS=0
+          FAILED=0
+          
+          echo "================= Adding $COLLABORATOR_TYPE '$COLLABORATOR' with '$PERMISSION' permission to $TOTAL repositories"
+          echo ""
+          
+          while IFS= read -r REPO; do
+            if [ -z "$REPO" ]; then
+              continue
+            fi
+            
+            echo "Processing: $ORG_NAME/$REPO"
+            
+            if [ "$COLLABORATOR_TYPE" = "team" ]; then
+              # For teams, use the team endpoint
+              if gh api -X PUT /repos/$ORG_NAME/$REPO/teams/$COLLABORATOR -f permission=$PERMISSION > /dev/null 2>&1; then
+                echo "  ✓ Added team '$COLLABORATOR' with '$PERMISSION' permission"
+                ((SUCCESS++))
+              else
+                echo "  ✗ Failed to add team '$COLLABORATOR'"
+                ((FAILED++))
+              fi
+            else
+              # For users, use the collaborators endpoint
+              if gh api -X PUT /repos/$ORG_NAME/$REPO/collaborators/$COLLABORATOR -f permission=$PERMISSION > /dev/null 2>&1; then
+                echo "  ✓ Added user '$COLLABORATOR' with '$PERMISSION' permission"
+                ((SUCCESS++))
+              else
+                echo "  ✗ Failed to add user '$COLLABORATOR'"
+                ((FAILED++))
+              fi
+            fi
+          done <<< "$REPOS"
+          
+          echo ""
+          echo "================= Summary"
+          echo "Total repositories processed: $TOTAL"
+          echo "Successful: $SUCCESS"
+          echo "Failed: $FAILED"
+
+      - name: Add Collaborator to Specific Repo
+        if: inputs.target_repos == 'specific'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
+          COLLABORATOR: ${{ inputs.collaborator_name }}
+          COLLABORATOR_TYPE: ${{ inputs.collaborator_type }}
+          PERMISSION: ${{ inputs.permission }}
+          ORG_NAME: ${{ github.repository_owner }}
+          REPO: ${{ inputs.specific_repo }}
+        run: |
+          echo "================= Adding $COLLABORATOR_TYPE '$COLLABORATOR' to $ORG_NAME/$REPO"
+          
+          if [ "$COLLABORATOR_TYPE" = "team" ]; then
+            # For teams, use the team endpoint
+            if gh api -X PUT /repos/$ORG_NAME/$REPO/teams/$COLLABORATOR -f permission=$PERMISSION; then
+              echo "✓ Successfully added team '$COLLABORATOR' with '$PERMISSION' permission to $REPO"
+            else
+              echo "✗ Failed to add team '$COLLABORATOR' to $REPO"
+              exit 1
+            fi
+          else
+            # For users, use the collaborators endpoint
+            if gh api -X PUT /repos/$ORG_NAME/$REPO/collaborators/$COLLABORATOR -f permission=$PERMISSION; then
+              echo "✓ Successfully added user '$COLLABORATOR' with '$PERMISSION' permission to $REPO"
+            else
+              echo "✗ Failed to add user '$COLLABORATOR' to $REPO"
+              exit 1
+            fi
+          fi
+
+      - name: Workflow Summary
+        if: always()
+        run: |
+          echo "## Collaborator Addition Complete"
+          echo "- Collaborator Type: ${{ inputs.collaborator_type }}"
+          echo "- Collaborator Name: ${{ inputs.collaborator_name }}"
+          echo "- Target Scope: ${{ inputs.target_repos }}"
+          if [ "${{ inputs.target_repos }}" = "specific" ]; then
+            echo "- Repository: ${{ inputs.specific_repo }}"
+          fi
+          echo "- Permission Level: ${{ inputs.permission }}"

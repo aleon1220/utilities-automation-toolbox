@@ -17,6 +17,9 @@ import static java.time.Month.APRIL;
 import static java.time.Month.JUNE;
 import static java.time.Month.OCTOBER;
 import static java.time.Month.DECEMBER;
+import java.time.temporal.IsoFields;
+import java.time.temporal.WeekFields;
+import java.util.Locale;
 
 import static java.util.Map.entry;
 import java.util.Optional;
@@ -46,12 +49,13 @@ public class WorkLogConfig implements Runnable {
     // todo: move to separate class or file if they get more complex to simplify
     public static String markdownWorkLogDayStructure = """
             ## GOALS
+            
             1. Main Planning System
             2. [Trello](https://trello.com/c/63qYHZ9V)
             3. Client planning system
 
             ## QUESTIONS
-            1. ?
+            1. todo_add_question?
 
             ## MORNING
 
@@ -61,7 +65,7 @@ public class WorkLogConfig implements Runnable {
             2. 🔄 What is planned for today
               - **todo_planned**
             3. ❗ blockers & escalations
-              - **todo_blocker**
+              - **todo_add_blocker**
 
             ## AFTERNOON
             ### TODO_activity_name
@@ -78,10 +82,14 @@ public class WorkLogConfig implements Runnable {
 
             ### Timesheet submission
             - NZ_Timesheet_Code todo_add
+            
             """;
 
     // todo: add more holidays, and move to separate class or file if they get more
     // complex to simplify
+    static LocalDate endOfMonth = LocalDate.now()
+            .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
+
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
             entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
@@ -102,6 +110,7 @@ public class WorkLogConfig implements Runnable {
 
     // todo: the file name and title should be the same call
     static String formatDateForFileName(LocalDate date) {
+    private static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
         return formatter.format(date);
     }

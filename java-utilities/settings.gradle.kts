@@ -12,4 +12,5 @@ plugins {
 }
 
 rootProject.name = "java-utilities"
-include("lib")
+include("appJavaUtils")
+project(":appJavaUtils").projectDir = file("lib")
