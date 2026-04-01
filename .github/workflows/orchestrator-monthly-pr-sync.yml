@@ -1,61 +1,93 @@
 name: Monthly Branch Improvement Sync
+permissions:
+  contents: read
+  pull-requests: write
 
 on:
   schedule:
     # Runs at 00:00 on the 1st of every month to catch the previous month's branch
-    - cron: '0 0 1 * *'
+    - cron: "0 0 1 * *"
   workflow_dispatch: # Allows manual testing
 
 jobs:
-  find-and-pr:
+  create-monthly-sync-prs:
     runs-on: ubuntu-latest
     steps:
       - name: Calculate Target Branch Name
         id: vars
         run: |
-          # Get previous month details (e.g., 2026 01 january)
-          # Using 'last month' logic ensures we check the month that just ended
-          YEAR=$(date -d "last month" +%Y)
-          MONTH_NUM=$(date -d "last month" +%m)
-          MONTH_NAME=$(date -d "last month" +%B | tr '[:upper:]' '[:lower:]')
-          
+          # Run date once and extract components
+          BASE_DATE=$(date -d "last month" +%Y-%m-%B)
+          YEAR=$(echo $BASE_DATE | cut -d'-' -f1)
+          MONTH_NUM=$(echo $BASE_DATE | cut -d'-' -f2)
+          MONTH_NAME=$(echo $BASE_DATE | cut -d'-' -f3 | tr '[:upper:]' '[:lower:]')
           echo "branch_pattern=${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements" >> $GITHUB_OUTPUT
 
-      - name: Process Repositories
+      - name: Process GitHub Repositories
         env:
           GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
           BRANCH_NAME: ${{ steps.vars.outputs.branch_pattern }}
-          ORG_NAME: "aleon1220"
+          ORG_NAME: ${{ github.repository_owner }}
         run: |
-          echo "Searching for branch: $BRANCH_NAME"
-          
           # 1. Get list of all non-archived repos in the org/account
-          REPOS=$(gh repo list $ORG_NAME --limit 1000 --json name --jq '.[].name')
+          REPOS=$(gh repo list $ORG_NAME --limit 1000 --no-archived --json name --jq '.[].name')
+          echo "================= repos extracted"
 
-          for REPO in $REPOS; do
-            echo "Checking $ORG_NAME/$REPO..."
-            
-            # 2. Check if the specific improvement branch exists
-            BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME -w "%{http_code}" || echo "404")
+          echo "$REPOS" | while read -r REPO; do
+            # 2. Check if improvement branch exists
+            echo "================= Checking repository $ORG_NAME/$REPO for branch $BRANCH_NAME"
+            BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
 
-            if [ "$BRANCH_EXISTS" -eq "200" ]; then
-              echo "Branch found! Checking for existing PRs..."
+            if [ "$BRANCH_GEN_AI" != "404" ]; then
+              # Check if branch has commits not in main
+              COMMITS_AHEAD=$(gh api repos/$ORG_NAME/$REPO/compare/main...$BRANCH_NAME --jq '.ahead_by' 2>/dev/null || echo "0")
               
-              # 3. Check if a PR already exists to avoid duplicates
-              PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
+              if [ "$COMMITS_AHEAD" -gt 0 ]; then
+                echo "Branch found with updates! Checking for existing PRs..."
+                
+                # 3. Check if a PR already exists to avoid duplicates
+                PR_EXISTS=$(gh pr list -R $ORG_NAME/$REPO -H $BRANCH_NAME --json number --jq '.[0].number')
+                
+                if [ -z "$PR_EXISTS" ]; then
+                  # Ensure the label exists
+                  gh label create "automated-pr" --color "#ededed" --description "GitHub Actions Automated PRs" --repo $ORG_NAME/$REPO 2>/dev/null || true
+                  
+                  # Grant reviewer read access (requires ORG_LEVEL_TOKEN to have admin rights on the repo)
+                  echo "================= Assigning pull permissions to reviewer..."
+                  gh api --method PUT \
+                    -H "Accept: application/vnd.github+json" \
+                    -H "X-GitHub-Api-Version: 2026-03-10" \
+                    repos/$ORG_NAME/$REPO/collaborators/Matet17 \
+                    -f permission=pull --silent
+                  
+                  # 4. Create PR to merge improvements branch into main
+                  echo "================= Creating Monthly Pull Request for $REPO..."
+                  gh pr create \
+                    --repo $ORG_NAME/$REPO \
+                    --base main \
+                    --head $BRANCH_NAME \
+                    --label "automated-pr" \
+                    --title "Monthly Improvements: $BRANCH_NAME" \
+                    --body "GitHub Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main." \
+                    --reviewer "Matet17"
 
-              if [ -z "$PR_EXISTS" ]; then
-                echo "Creating PR for $REPO..."
-                gh pr create \
-                  -R $ORG_NAME/$REPO \
-                  -B main \
-                  -H $BRANCH_NAME \
-                  -t "Monthly Improvements: $BRANCH_NAME" \
-                  -b "Automated PR to merge monthly improvements from $BRANCH_NAME into main."
+                  echo "================= PR created for $REPO."
+                else
+                  echo "================= PR exists (#$PR_EXISTS). Skipping."
+                fi
               else
-                echo "PR already exists (#$PR_EXISTS). Skipping."
+                 echo "================= Branch exists but has no new commits ahead of main. Skipping PR creation."
               fi
             else
-              echo "Branch not found in $REPO."
+              echo "================= No improvement branch found for $REPO, skipping..."
             fi
           done
+
+      - name: provide verbose output this repo debugging
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}      
+        run: | 
+          echo "================= online docs https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10"
+          echo "================= smoke test verbose api call to list branches in this repo"
+          gh api --verbose "repos/${GITHUB_REPOSITORY}/branches"
+          
