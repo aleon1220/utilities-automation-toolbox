@@ -17,10 +17,6 @@ import static java.time.Month.APRIL;
 import static java.time.Month.JUNE;
 import static java.time.Month.OCTOBER;
 import static java.time.Month.DECEMBER;
-import java.time.temporal.IsoFields;
-import java.time.temporal.WeekFields;
-import java.util.Locale;
-
 import static java.util.Map.entry;
 import java.util.Optional;
 
@@ -49,7 +45,7 @@ public class WorkLogConfig implements Runnable {
     // todo: move to separate class or file if they get more complex to simplify
     public static String markdownWorkLogDayStructure = """
             ## GOALS
-            
+
             1. Main Planning System
             2. [Trello](https://trello.com/c/63qYHZ9V)
             3. Client planning system
@@ -82,7 +78,7 @@ public class WorkLogConfig implements Runnable {
 
             ### Timesheet submission
             - NZ_Timesheet_Code todo_add
-            
+
             """;
 
     // todo: add more holidays, and move to separate class or file if they get more
@@ -110,7 +106,6 @@ public class WorkLogConfig implements Runnable {
 
     // todo: the file name and title should be the same call
     static String formatDateForFileName(LocalDate date) {
-    private static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
         return formatter.format(date);
     }

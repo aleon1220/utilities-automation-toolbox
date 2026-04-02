@@ -6,7 +6,7 @@ WorkLogConfig is a Picocli-based CLI automation tool that generates daily markdo
 
 uses the format **File Name Format yyyy-MM-dd-EEEE.md** Example: `2026-03-17-Tuesday.md`
 
-# 📘 WorkLogConfig – Core Responsibilities & Usage Guide
+## 📘 WorkLogConfig – Core Responsibilities & Usage Guide
 
 ## Core Responsibilities
 
@@ -31,35 +31,37 @@ The utility generates **one `.md` file per business day** within the given date 
 * Inserts a **title header** for the date.
 * Inserts the **daily worklog markdown template**.
 * When date falls on a **Friday**, the tool appends an additional sections
-  *  **Reflection**
-  *  **Learning & Next Goals**
+  * **Reflection**
+  * **Learning & Next Goals**
 * skips Weekends (Saturday & Sunday)
 * skips New Zealand Public Holidays (hardcoded for 2026)
 
 ***
 
-# Executing the utilities
+## Executing the utilities
 
-## 🧪 Unit Test Build & Run
+### 🧪 Unit Test Build & Run
 
-- from the root of this repo navigate to gradle project directory
+* navigate to gradle project directory
+
 ```bash
 pushd ./java-utilities
 ```
 
-#### **Clean Build**
+### **Clean Build**
 
 ```bash
 gradle clean build 2>&1
 ```
 
-#### **List Build Output**
+### **List Build Output**
 
 ```bash
 ls -lh lib/build
 ```
 
-#### **Run Help Command**
+### **Run Help Command**
+
 ```bash
 gradle run --args="--help"
 ```

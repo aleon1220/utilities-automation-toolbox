@@ -4,11 +4,8 @@
 package org.utils;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
-
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import java.time.LocalDate;
-
-import org.utils.WorkLogConfig;
 
 class WorkLogConfigTest {
     @Test

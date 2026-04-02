@@ -33,9 +33,9 @@ jobs:
           REPOS=$(gh repo list $ORG_NAME --limit 1000 --no-archived --json name --jq '.[].name')
           echo "================= repos extracted"
 
-            BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
-            echo "Searching for branch $BRANCH_NAME"
-=======
+          BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
+          echo "Searching for branch $BRANCH_NAME"
+
           echo "$REPOS" | while read -r REPO; do
             # 2. Check if improvement branch exists
             echo "================= Checking repository $ORG_NAME/$REPO for branch $BRANCH_NAME"
@@ -51,8 +51,6 @@ jobs:
                   # 4. Create PR to merge improvements branch into main
                   echo "================= Creating Monthly Pull Request for repository $REPO..."
 
-=======
-              
               if [ "$COMMITS_AHEAD" -gt 0 ]; then
                 echo "Branch found with updates! Checking for existing PRs..."
                 
