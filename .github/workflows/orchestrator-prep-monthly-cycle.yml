@@ -7,16 +7,22 @@ jobs:
   create-improvement-branches:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Make logger readable
+        run: chmod +r .github/scripts/logging.sh || true
+
       - name: Pretty logging example
+        shell: bash
         run: |
-          ls -lha .
-          
           # source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-          # source "scripts/logging.sh"
+          source .github/scripts/logging.sh
           log INFO "This is an info example"
           echo "::group::git branch list"
           git branch -a
           echo "::endgroup::"
+          log WARN "Smoke test finished"
 
       - name: Verify Date & Calculate Target Branch
         id: vars
