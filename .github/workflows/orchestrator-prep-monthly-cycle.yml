@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Pretty logging example
         run: |
-          ls -lha ${GITHUB_WORKSPACE}
+          ls -lha .
           
           # source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
           # source "scripts/logging.sh"
