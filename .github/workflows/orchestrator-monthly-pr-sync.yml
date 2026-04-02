@@ -13,6 +13,9 @@ jobs:
   create-monthly-sync-prs:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
       - name: Calculate Target Branch Name
         id: vars
         run: |
@@ -33,8 +36,9 @@ jobs:
           REPOS=$(gh repo list $ORG_NAME --limit 1000 --no-archived --json name --jq '.[].name')
           echo "================= repos extracted"
 
-            BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
-            echo "Searching for branch $BRANCH_NAME"
+          BRANCH_GEN_AI=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
+          echo "Searching for branch $BRANCH_NAME"
+
           echo "$REPOS" | while read -r REPO; do
             # 2. Check if improvement branch exists
             echo "================= Checking repository $ORG_NAME/$REPO for branch $BRANCH_NAME"
@@ -60,6 +64,7 @@ jobs:
                   # Ensure the label exists
                   gh label create "automated-pr" --color "#ededed" --description "GitHub Actions Automated PRs" --repo $ORG_NAME/$REPO 2>/dev/null || true
                   
+                  echo "::group::Assigning pull permissions to reviewer and creating PR"
                   # Grant reviewer read access (requires ORG_LEVEL_TOKEN to have admin rights on the repo)
                   echo "================= Assigning pull permissions to reviewer..."
                   gh api --method PUT \
@@ -78,8 +83,8 @@ jobs:
                     --title "Monthly Improvements: $BRANCH_NAME" \
                     --body "GitHub Actions Automated PR to merge monthly improvements from $BRANCH_NAME into main." \
                     --reviewer "Matet17"
-
                   echo "================= PR created for $REPO."
+                  echo "::endgroup::"
                 else
                   echo "================= PR exists (#$PR_EXISTS). Skipping."
                 fi
