@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Pretty logging example
         run: |
-          source ./.github/scripts/logging.sh
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
           log INFO "Starting monthly process: list branches of the repository"
           echo "::group::git branch list"
           git branch -a
