@@ -1,0 +1,102 @@
+name: Monthly Improvement Branch Creator
+
+on:
+  workflow_dispatch: # Allows manual testing and execution
+
+jobs:
+  create-improvement-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pretty logging example
+        run: |
+          source ./ci/logging.sh
+          log INFO "Starting monthly process: list branches of the repository"
+          echo "::group::git branch list"
+          git branch -a
+          echo "::endgroup::"
+          log WARN "This is a warning example"
+
+      - name: Verify Date & Calculate Target Branch
+        id: vars
+        run: |
+          # 1. Check if it is the first 5 days of the current month
+          CURRENT_DAY=$(date +%d | sed 's/^0*//') # Strip leading zeros
+          if [ "$CURRENT_DAY" -gt 5 ]; then
+            echo "Error: This action can only be run within the first 5 days of the month."
+            exit 1
+          fi
+
+          # 2. Calculate current month branch name
+          BASE_DATE=$(date +%Y-%m-%B)
+          YEAR=$(echo $BASE_DATE | cut -d'-' -f1)
+          MONTH_NUM=$(echo $BASE_DATE | cut -d'-' -f2)
+          MONTH_NAME=$(echo $BASE_DATE | cut -d'-' -f3 | tr '[:upper:]' '[:lower:]')
+          BRANCH_NAME="${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements"
+
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "Target Branch for this run: $BRANCH_NAME"
+
+      - name: Process GitHub Repositories
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
+          BRANCH_NAME: ${{ steps.vars.outputs.branch_name }}
+          ORG_NAME: ${{ github.repository_owner }}
+        run: |
+          source ./ci/logging.sh
+          
+          THIRTY_DAYS_AGO=$(date -d "30 days ago" +%s)
+
+          REPOS=$(gh repo list $ORG_NAME --limit 1000 --no-archived --json name --jq '.[].name')
+          log INFO "Starting monthly process: as within the last 30 days"
+          echo "================= Repositories extracted"
+
+          echo "$REPOS" | while read -r REPO; do
+            echo "================= Processing $ORG_NAME/$REPO"
+            
+            # 1. Check for recently merged PR to main
+            LAST_MERGED=$(gh pr list -R $ORG_NAME/$REPO --state merged --base main --limit 1 --json mergedAt --jq '.[0].mergedAt' || echo "")
+            
+            if [ -z "$LAST_MERGED" ]; then
+              echo "================= No merged PRs found for main. Skipping."
+              continue
+            fi
+            
+            MERGE_SEC=$(date -d "$LAST_MERGED" +%s)
+            if [ "$MERGE_SEC" -lt "$THIRTY_DAYS_AGO" ]; then
+              echo "================= Most recent PR merge is older than 30 days. Skipping."
+              log WARN "Most recent PR merge is older than 30 days. Skipping."
+              continue
+            fi
+            log INFO "Compare merged timestamp PRs to 30 days ago"
+            echo "================= Recent PR merge detected. Checking if $BRANCH_NAME exists..."
+            
+            # 2. Check if the target branch already exists
+            BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
+            
+            if [ "$BRANCH_EXISTS" != "404" ]; then
+              echo "================= Branch $BRANCH_NAME already exists. Skipping."
+              log WARN "Branch $BRANCH_NAME already exists. Skipping."
+              continue
+            fi
+            
+            # 3. Create the new branch from main
+            MAIN_SHA=$(gh api repos/$ORG_NAME/$REPO/git/ref/heads/main --jq '.object.sha' 2>/dev/null || echo "")
+            
+            if [ -z "$MAIN_SHA" ]; then
+              echo "================= Could not fetch main branch SHA. Skipping."
+              log ERROR "Could not fetch main branch SHA. Skipping."
+              continue
+            fi
+            
+            echo "================= Creating branch $BRANCH_NAME for $REPO..."
+            gh api --method POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              repos/$ORG_NAME/$REPO/git/refs \
+              -f ref="refs/heads/$BRANCH_NAME" \
+              -f sha="$MAIN_SHA" \
+              --silent
+              
+            echo "================= Successfully created $BRANCH_NAME in $REPO."
+            log INFO "Successfully created branch $BRANCH_NAME in $REPO."
+          done
