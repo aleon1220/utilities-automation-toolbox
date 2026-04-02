@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Pretty logging example
         run: |
-          source ./scripts/logging.sh
+          source ./.github/scripts/logging.sh
           log INFO "Starting monthly process: list branches of the repository"
           echo "::group::git branch list"
           git branch -a
@@ -42,7 +42,7 @@ jobs:
           BRANCH_NAME: ${{ steps.vars.outputs.branch_name }}
           ORG_NAME: ${{ github.repository_owner }}
         run: |
-          source ./scripts/logging.sh
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
           
           THIRTY_DAYS_AGO=$(date -d "30 days ago" +%s)
 
