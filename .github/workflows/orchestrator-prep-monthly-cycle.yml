@@ -9,14 +9,14 @@ jobs:
     steps:
       - name: Pretty logging example
         run: |
+          ls -lha ${GITHUB_WORKSPACE}
+          
           # source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-          cd .github
-          source "scripts/logging.sh"
+          # source "scripts/logging.sh"
           log INFO "This is an info example"
           echo "::group::git branch list"
           git branch -a
           echo "::endgroup::"
-          log WARN "This is a warning example"
 
       - name: Verify Date & Calculate Target Branch
         id: vars
