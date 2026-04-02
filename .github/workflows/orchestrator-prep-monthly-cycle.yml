@@ -16,8 +16,7 @@ jobs:
       - name: Pretty logging example
         shell: bash
         run: |
-          # source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-          source .github/scripts/logging.sh
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
           log INFO "This is an info example"
           echo "::group::git branch list"
           git branch -a
@@ -77,14 +76,23 @@ jobs:
             fi
             log INFO "Compare merged timestamp PRs to 30 days ago"
             echo "================= Recent PR merge detected. Checking if $BRANCH_NAME exists..."
+            log INFO "Checking if branch $BRANCH_NAME is in repo $REPO."
             
             # 2. Check if the target branch already exists
-            BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
-            
-            if [ "$BRANCH_EXISTS" != "404" ]; then
-              echo "================= Branch $BRANCH_NAME already exists. Skipping."
+            # BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
+            # if [ "$BRANCH_EXISTS" != "404" ]; then
+            #   echo "================= Branch $BRANCH_NAME already exists. Skipping."
+            #   log WARN "Branch $BRANCH_NAME already exists. Skipping."
+            #   continue
+            # fi
+
+            if gh api -H "Accept: application/vnd.github+json" \
+                  repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME \
+                  --silent >/dev/null 2>&1; then
+              echo "branch exists"
               log WARN "Branch $BRANCH_NAME already exists. Skipping."
-              continue
+            else
+              echo "branch missing"
             fi
             
             # 3. Create the new branch from main
