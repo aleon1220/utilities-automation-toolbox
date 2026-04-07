@@ -44,6 +44,7 @@ public class WorkLogConfig implements Runnable {
     // markdown templates
     // todo: move to separate class or file if they get more complex to simplify
     public static String markdownWorkLogDayStructure = """
+            # {{title_date}}
             ## GOALS
 
             1. Main Planning System
@@ -89,7 +90,8 @@ public class WorkLogConfig implements Runnable {
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
             entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
-            entry(LocalDate.of(2026, APRIL, 13), "Easter Monday"),
+            entry(LocalDate.of(2026, APRIL, 3), "Holy Week - Friday"),
+            entry(LocalDate.of(2026, APRIL, 6), "Holy Week - Easter Monday"),
             entry(LocalDate.of(2026, APRIL, 25), "ANZAC Day"),
             entry(LocalDate.of(2026, JUNE, 1), "Queen's Birthday"),
             entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
@@ -110,19 +112,14 @@ public class WorkLogConfig implements Runnable {
         return formatter.format(date);
     }
 
-    private static String createTitleForWorkLog(LocalDate date) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
-        var titleWorkLogDayFormatted = String.format("# %s \n", formatter.format(date));
-        return titleWorkLogDayFormatted;
-    }
-
     void createMarkdownFiles() {
         if (startDate.isEmpty() || endDate.isEmpty()) {
-            System.out.println("Start and end dates are required");
+            System.out.println("======= Start and end dates are required");
             return;
         }
 
         if (!isValidDateRange(startDate.get(), endDate.get())) {
+            System.out.println("======= Invalid date range");
             return;
         }
 
@@ -131,26 +128,27 @@ public class WorkLogConfig implements Runnable {
             for (LocalDate date = startDate.get(); !date.isAfter(endDate.get()); date = date.plusDays(1)) {
 
                 if (isWeekend(date)) {
-                    System.out.println("Skipping Weekend for " + formatDateForFileName(date));
+                    System.out.println("======= Skipping Weekend for " + formatDateForFileName(date));
                     continue;
                 }
 
                 if (isNZHoliday(date)) {
-                    System.out.println("Skipping Holiday: " + HOLIDAYS_2026.get(date));
+                    System.out.println("======= Skipping Holiday " + HOLIDAYS_2026.get(date));
                     continue;
                 }
 
                 var standardizedDateName = formatDateForFileName(date);
                 String fileName = standardizedDateName + ".md";
                 Path filePath = outputDir.resolve(fileName);
-
-                String title = createTitleForWorkLog(date);
-                Files.writeString(filePath, title + markdownWorkLogDayStructure);
+                var fullMarkdownContent = markdownWorkLogDayStructure.replace("{{title_date}}", standardizedDateName);
+                Files.writeString(filePath, fullMarkdownContent);
+                System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
 
                 if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
                     try (BufferedWriter writer = Files.newBufferedWriter(filePath,
                             java.nio.file.StandardOpenOption.APPEND)) {
                         writer.write(textFridayTemplate);
+                        System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
                     }
                 }
             }
@@ -161,13 +159,16 @@ public class WorkLogConfig implements Runnable {
     }
 
     // todo: this method is an attempt to append content. Simplify and generalise
-    public static void addContentToMarkdownFile() {
-        var overrideMarkdownFile = "C:\\ws\\04\\2025-04-30-Wednesday.md";
+    public static void addContentToMarkdownFile(String overrideMarkdownFile) {
+        // var overrideMarkdownFile = "C:\\ws\\04\\2025-04-30-Wednesday.md";
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFile, true))) {
             var xtraMarkdownContent = "extra markdown content to be added";
+            var headerWorkLogDayFormatted = String.format("## %s appending %n", formatDateForFileName(LocalDate.now()));
+            System.out.println("======= markdown content to add: " + headerWorkLogDayFormatted + xtraMarkdownContent);
+            writer.write(headerWorkLogDayFormatted);
             writer.write(xtraMarkdownContent);
             writer.newLine();
-            System.out.println("markdown template added to file " + overrideMarkdownFile);
+            System.out.println("======= markdown override added to file " + overrideMarkdownFile);
         } catch (IOException e) {
             e.printStackTrace();
         }
