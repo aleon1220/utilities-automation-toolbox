@@ -126,9 +126,8 @@ public class WorkLogConfig implements Runnable {
             return;
         }
 
-        Path outputDir = resolveOutputDirectory();
-
         try {
+            Path outputDir = resolveOutputDirectory();
             for (LocalDate date = startDate.get(); !date.isAfter(endDate.get()); date = date.plusDays(1)) {
 
                 if (isWeekend(date)) {
@@ -141,7 +140,8 @@ public class WorkLogConfig implements Runnable {
                     continue;
                 }
 
-                String fileName = formatDateForFileName(date) + ".md";
+                var standardizedDateName = formatDateForFileName(date);
+                String fileName = standardizedDateName + ".md";
                 Path filePath = outputDir.resolve(fileName);
 
                 String title = createTitleForWorkLog(date);
