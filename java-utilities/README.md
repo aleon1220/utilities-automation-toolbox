@@ -89,7 +89,15 @@ gradle run --args="--start $START_DATE --end $END_DATE"
 ./gradlew clean build shadowJar
 ```
 
-* After building your fat/uber JAR (e.g., `appJavaUtils-all.jar`):
+* After building your fat/uber JAR `appJavaUtils-all.jar`
+* location `./lib/build/libs/`
+* copy file to execution sandbox using WSL from Windows11
+
+```bash
+EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
+```
+### Execution
 
 * set dates
 
@@ -98,7 +106,7 @@ START_DATE="2026-03-10"
 END_DATE="2026-03-21"
 ```
 
-* execute utility to create markdown
+* execute utility to create markdown files
 
 ```bash
 java -jar appJavaUtils-all.jar --start $START_DATE --end $END_DATE
