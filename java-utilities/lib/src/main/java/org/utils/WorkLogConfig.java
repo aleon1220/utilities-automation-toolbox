@@ -61,12 +61,15 @@ public class WorkLogConfig implements Runnable {
             ### Daily Standup
 
             #### ✅ What was done yesterday
+
             - **todo_done**
             
             #### 🔄 What is planned for today
+
             - **todo_planned**
             
             #### ❗ blockers & escalations
+
             - **todo_add_blocker**
 
             ## AFTERNOON
@@ -90,7 +93,7 @@ public class WorkLogConfig implements Runnable {
             ### Timesheet submission
 
             - NZ_Timesheet_Code todo_add
-
+            %n
             """;
 
     // todo: add more holidays, and move to separate class or file if they get more
@@ -110,11 +113,12 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day"));
 
     static String textFridayTemplate = """
-
             ## End of week Reflection | Learning & Next Goals
+
             1. reflection
-            2.
-            3.
+            2. learning
+            3. next_week_goal
+
             """;
 
     // todo: the file name and title should be the same call
