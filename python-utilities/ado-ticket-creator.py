@@ -1,15 +1,19 @@
-# List of applications to create tickets for
-# applications = [
-    # "vwise-loadcontrolservices", "vwise-flightscheduleservices", "vwise-inflightdataservices", "vwise-businessintelligenceservices", "vwise-eftposservices", 
-    # "vwise-crewingservices", "vwise-inflightopsservices", "vwise-paxservices", "vwise-seatingservices", 
-    # "vwise-flightservices", "vwise-checkinservices", "vwise-commsservices", "vwise-departureservices", "vwise-authservices", 
-    # "vwise-availabilityservices","vwise-baggageservices","vwise-boardingservices","vwise-logpaymentservices"
-# ]
-
 import requests
 import json
 import os
 from requests.auth import HTTPBasicAuth
+
+# script that creates Azure devops tickets for smoke testing of applications deployed in ECS Fargate. 
+# It reads the organization, project, and PAT token from environment variables, creates a User Story work item 
+# for each application in the list, linking it to a specified Feature.
+# applications = [
+    # "webservice-loadcontrol", "webservice-flights", "webservice-inflight", "webservice-business", 
+    # "webservice-eftposservices", "webservice-crew", "webservice-ops", "webservice-pax", 
+    #  "webservice-seating", "webservice-fly", "webservice-checkin",
+    #  "webservice-comms", "webservice-departure", "webservice-auth", 
+    # "webservice-availability","webservice-baggage",
+    # "webservice-boarding", "webservice-logpay"
+# ]
 
 # Read organization, project, and PAT from environment variables
 organization = os.getenv("ADO_ORG")
@@ -32,88 +36,25 @@ headers = {
 
 # List of applications to create tickets for (with associated feature IDs)
 
-
-# applications = [ 
-                  # ("vwise-availabilityservices",694986),
-                  # ("vwise-baggageservices",742659),
-                  # ("vwise-boardingservices",694984),
-                  # ("vwise-businessintelligenceservices",694984),
-                  # ("vwise-checkinservices",694984),
-                  # ("vwise-crewingservices",694984),
-                  # ("vwise-eftposservices",694984),
-                  # ("vwise-flightservices",694984),
-                  # ("vwise-inflightopsservices",742603),
-                  # ("vwise-loadcontrolservices", 742603),
-                  # ("vwise-paxservices",694984),
-                  # ("vwise-seatingservices",694986),
-                  # ("vwise-logpaymentservices",694986),
-                  # ("vwise-authservices",743273),
-                  # ("vwise-departureservices",743273),
-                  # ("vwise-commsservices",694984)
-                 # ]
 applications = [ 
-                  ("vwise-availabilityservices",694986),
-                  ("vwise-baggageservices",742659),
-                  ("vwise-boardingservices",694984),                  
-                  ("vwise-checkinservices",694984),
-                  ("vwise-crewingservices",694984),
-                  ("vwise-eftposservices",694984),
-                  ("vwise-flightservices",694984),
-                  ("vwise-inflightopsservices",742603),
-                  ("vwise-loadcontrolservices", 742603),
-                  ("vwise-paxservices",694984),
-                  ("vwise-seatingservices",694986),                  
-                  ("vwise-authservices",743273),
-                  ("vwise-departureservices",743273),
-                  ("vwise-commsservices",694984),
+                  ("webservice-availability",694986),
+                  ("webservice-baggage",742659),
+                  ("webservice-boarding",694984),                  
+                  ("webservice-checkin",694984),
+                  ("webservice-crew",694984),
+                  ("webservice-eftposservices",694984),
+                  ("webservice-fly",694984),
+                  ("webservice-ops",742603),
+                  ("webservice-loadcontrol", 742603),
+                  ("webservice-pax",694984),
+                  ("webservice-seating",694986),                  
+                  ("webservice-auth",743273),
+                  ("webservice-departure",743273),
+                  ("webservice-comms",694984),
                  ]
-                  
-#applications = [ ("alexei-test", 694984) ]
 
 for app, feature_id in applications:
-    # Build the JSON patch document payload with dynamic title
-    # payload = [
-        # {
-            # "op": "add",
-            # "path": "/fields/System.Title",
-            # "value": f"{app} smoke testing of ECS PROD deployment"
-        # },
-        # {
-            # "op": "add",
-            # "path": "/fields/System.Description",
-            # "value": (
-                # "<b>As an</b> Application Owner<br><br>"
-                # "<b>I need</b> to make sure that<br><br>"
-                # "Application deployed in Fargate is equal to the application on Websphere, and functions just as well<br><br>"
-                # "<b>So that</b> Application is functioning before the cutover<br>"
-            # )
-        # },
-        # {
-            # "op": "add",
-            # "path": "/fields/Microsoft.VSTS.Common.AcceptanceCriteria", "value": (
-                # "<ul>"
-                # "<li>Identify most frequent <b>read request</b> (via Splunk) for the service in prod and send it using Postman to the ECS URL</li>"
-                # "<li>Response should be 200</li>"
-                # "<li>Response should be similar to the one in production</li>"
-                # "</ul>"
-            # )
-        # },
-        # {
-            # "op": "add",
-            # "path": "/fields/System.Tags",
-            # "value": "ShadowSRESquad"
-        # },
-        # {
-            # "op": "add",
-            # "path": "/fields/System.AreaPath",
-            # "value": "AirNZ\\Tribes\\Digital Platforms\\Platforms and tools"
-        # },
-        # {
-            # "op": "add",
-            # "path": "/fields/System.IterationPath",
-            # "value": "AirNZ\\Iterations\\FY25\\25.Q4\\Sprint 25"
-        # }
-    # ]
+    # Build the JSON patch document payload with dynamic title and description
     payload = [
         {
             "op": "add",
