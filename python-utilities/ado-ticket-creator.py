@@ -5,15 +5,7 @@ from requests.auth import HTTPBasicAuth
 
 # script that creates Azure devops tickets for smoke testing of applications deployed in ECS Fargate. 
 # It reads the organization, project, and PAT token from environment variables, creates a User Story work item 
-# for each application in the list, linking it to a specified Feature.
-# applications = [
-    # "webservice-loadcontrol", "webservice-flights", "webservice-inflight", "webservice-business", 
-    # "webservice-eftposservices", "webservice-crew", "webservice-ops", "webservice-pax", 
-    #  "webservice-seating", "webservice-fly", "webservice-checkin",
-    #  "webservice-comms", "webservice-departure", "webservice-auth", 
-    # "webservice-availability","webservice-baggage",
-    # "webservice-boarding", "webservice-logpay"
-# ]
+# for each application, linking it to a specified Feature.
 
 # Read organization, project, and PAT from environment variables
 organization = os.getenv("ADO_ORG")

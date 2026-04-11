@@ -97,6 +97,7 @@ gradle run --args="--start $START_DATE --end $END_DATE"
 EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
 cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
 ```
+
 ### Execution
 
 * set dates
