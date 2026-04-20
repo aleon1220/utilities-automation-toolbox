@@ -3,9 +3,9 @@ import json
 import os
 from requests.auth import HTTPBasicAuth
 
-# script that creates Azure devops tickets for smoke testing of applications deployed in ECS Fargate. 
-# It reads the organization, project, and PAT token from environment variables, creates a User Story work item 
-# for each application, linking it to a specified Feature.
+# Creates Azure devops tickets for smoke testing of applications deployed in AWS ECS Fargate.
+# it reads the organization, project, and PAT token from environment variables, 
+# for each application, creates User Story work item linking it to a specified Feature.
 
 # Read organization, project, and PAT from environment variables
 organization = os.getenv("ADO_ORG")
@@ -87,12 +87,12 @@ for app, feature_id in applications:
         {
             "op": "add",
             "path": "/fields/System.AreaPath",
-            "value": "AirNZ\\Tribes\\Digital Platforms\\Platforms and tools"
+            "value": "Aviation\\Tribes\\Digital Platforms\\Platforms and tools"
         },
         {
             "op": "add",
             "path": "/fields/System.IterationPath",
-            "value": "AirNZ\\Iterations\\FY26\\26.Q1\\Sprint 1"
+            "value": "Aviation\\Iterations\\FY26\\26.Q1\\Sprint 1"
         }
     ]
 
