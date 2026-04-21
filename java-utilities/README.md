@@ -2,7 +2,7 @@
 
 ## WorkLog markdown
 
-WorkLogConfig is a Picocli-based CLI automation tool that generates daily markdown worklog files between a start and end date.
+WorkLog is a Picocli-based CLI automation tool that generates daily markdown worklog files between a start and end date.
 
 uses the format **File Name Format yyyy-MM-dd-EEEE.md** Example: `2026-03-17-Tuesday.md`
 

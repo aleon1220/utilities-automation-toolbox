@@ -25,7 +25,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 // The @CommandLineSchema annotation tells the JVM how to map args to this record
-@Command(name = "worklog", description = "%nWork log markdown file creator tool%n", footer = {
+@Command(name = "worklog", description = "%nWork log markdown file creator%n", footer = {
         "%nExample: create logs March 2026",
         "   worklog --start 2026-03-01 --end 2026-03-31",
         "   worklog -s 2026-03-01 -e 2026-03-31"
@@ -41,7 +41,7 @@ public class WorkLogConfig implements Runnable {
     @Option(names = { "-h", "--help" }, usageHelp = true, description = "worklog Show this help message and exit")
     boolean help;
 
-    // markdown templates
+    // markdown template
     // todo: move to separate class or file if they get more complex to simplify
     public static String markdownWorkLogDayStructure = """
             # {{title_date}}
@@ -96,7 +96,7 @@ public class WorkLogConfig implements Runnable {
             %n
             """;
 
-    // todo: add more holidays, and move to separate class or file if they get more
+    // todo: add more holidays move to separate class or file if they get more
     // complex to simplify
     static LocalDate endOfMonth = LocalDate.now()
             .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
@@ -121,7 +121,6 @@ public class WorkLogConfig implements Runnable {
 
             """;
 
-    // todo: the file name and title should be the same call
     static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
         return formatter.format(date);
@@ -258,7 +257,7 @@ public class WorkLogConfig implements Runnable {
         System.exit(exitCode);
     }
 
-    // todo: add some prints that show the output directory and file names being
+    // todo: add logs that show the output directory and file names being
     // created for better visibility and debugging
     private static Path resolveOutputDirectory() {
         String base = "/mnt/c/workspace/TESTS";
