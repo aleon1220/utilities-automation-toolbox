@@ -3,6 +3,8 @@ package org.utils;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.DayOfWeek;
@@ -41,63 +43,7 @@ public class WorkLogConfig implements Runnable {
     @Option(names = { "-h", "--help" }, usageHelp = true, description = "worklog Show this help message and exit")
     boolean help;
 
-    // markdown template
-    // todo: move to separate class or file if they get more complex to simplify
-    public static String markdownWorkLogDayStructure = """
-            # {{title_date}}
-            
-            ## GOALS
-
-            1. Main Planning System
-            2. [Trello](https://trello.com/c/63qYHZ9V)
-            3. Client planning system
-
-            ## QUESTIONS
-
-            1. todo_add_question?
-
-            ## MORNING
-
-            ### Daily Standup
-
-            #### ✅ What was done yesterday
-
-            - **todo_done**
-            
-            #### 🔄 What is planned for today
-
-            - **todo_planned**
-            
-            #### ❗ blockers & escalations
-
-            - **todo_add_blocker**
-
-            ## AFTERNOON
-
-            ### TODO_activity_name
-
-            1. todo_important_note
-
-            ## WRAP UP DAY
-
-            ## Tasks for next business day
-
-            1. todo
-            2. todo
-
-            ### Day Reflection & Learning
-
-            1. todo_add_reflection
-            2. todo_add_learning
-
-            ### Timesheet submission
-
-            - NZ_Timesheet_Code todo_add
-            %n
-            """;
-
-    // todo: add more holidays move to separate class or file if they get more
-    // complex to simplify
+    // todo: add holidays to separate class
     static LocalDate endOfMonth = LocalDate.now()
             .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
 
@@ -120,6 +66,16 @@ public class WorkLogConfig implements Runnable {
             3. next_week_goal
 
             """;
+
+    static String loadResource(String resourcePath) {
+        try (var in = WorkLogConfig.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (in == null)
+                throw new IllegalStateException("Template not found on classpath: " + resourcePath);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read resource: " + resourcePath, e);
+        }
+    }
 
     static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
@@ -154,7 +110,11 @@ public class WorkLogConfig implements Runnable {
                 var standardizedDateName = formatDateForFileName(date);
                 String fileName = standardizedDateName + ".md";
                 Path filePath = outputDir.resolve(fileName);
-                var fullMarkdownContent = markdownWorkLogDayStructure.replace("{{title_date}}", standardizedDateName);
+
+                var template = loadResource("templates/worklog-day.md");
+                var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
+                
+                Files.writeString(filePath, fullMarkdownContent);
                 Files.writeString(filePath, fullMarkdownContent);
                 System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
 
