@@ -1,0 +1,126 @@
+name: Monthly Improvement Branch Creator
+
+on:
+  workflow_dispatch: # Allows manual testing and execution
+
+jobs:
+  create-improvement-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Make logger readable
+        run: chmod +r .github/scripts/logging.sh || true
+
+      - name: Pretty logging example
+        shell: bash
+        run: |
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+          log INFO "github list branches in a group abstraction"
+          echo "::group::git branch list"
+          git branch -a
+          echo "::endgroup::"
+          log WARN "Smoke test WARN color logging"
+          log INFO "INFO color logging"
+
+      - name: Verify Date & Calculate Target Branch
+        id: vars
+        run: |
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+          log INFO "Checking if it is the first 5 days of the current month"
+          
+          echo "::group::set up git branching metadata"
+          CURRENT_DAY=$(date +%d | sed 's/^0*//') # Strip leading zeros
+          if [ "$CURRENT_DAY" -gt 5 ]; then
+            log ERROR "automation only works within the first 5 days of the month"
+            exit 1
+          fi
+
+          # 2. Calculate current month branch name
+          BASE_DATE=$(date +%Y-%m-%B)
+          YEAR=$(echo $BASE_DATE | cut -d'-' -f1)
+          MONTH_NUM=$(echo $BASE_DATE | cut -d'-' -f2)
+          MONTH_NAME=$(echo $BASE_DATE | cut -d'-' -f3 | tr '[:upper:]' '[:lower:]')
+          BRANCH_NAME="${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements"
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          log INFO "calulated info for current month "
+          log INFO "Target Branch for the run: $BRANCH_NAME"
+          echo "::endgroup::"
+
+      - name: Process GitHub Repositories
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
+          BRANCH_NAME: ${{ steps.vars.outputs.branch_name }}
+          ORG_NAME: ${{ github.repository_owner }}
+        run: |
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+          
+          echo "::group::assess repos with recent merges to main for branch creation"
+          log INFO "Starting monthly process: as within the last 30 days"
+          THIRTY_DAYS_AGO=$(date -d "30 days ago" +%s)
+          REPOS=$(gh repo list $ORG_NAME --limit 1000 --no-archived --json name --jq '.[].name')
+          log INFO "Repositories extracted"
+          echo "::endgroup::"
+
+          echo "::group::creates new branches for repos with recent merges to main"
+          echo "$REPOS" | while read -r REPO; do
+            echo "================= Processing $ORG_NAME/$REPO"
+            
+            # 1. Check for recently merged PR to main
+            LAST_MERGED=$(gh pr list -R $ORG_NAME/$REPO --state merged --base main --limit 1 --json mergedAt --jq '.[0].mergedAt' || echo "")
+            
+            if [ -z "$LAST_MERGED" ]; then
+              echo "================= No merged PRs found for main. Skipping."
+              continue
+            fi
+            
+            MERGE_SEC=$(date -d "$LAST_MERGED" +%s)
+            if [ "$MERGE_SEC" -lt "$THIRTY_DAYS_AGO" ]; then
+              echo "================= Most recent PR merge is older than 30 days. Skipping."
+              log WARN "Most recent PR merge is older than 30 days. Skipping."
+              continue
+            fi
+
+            log INFO "Compare merged timestamp PRs to 30 days ago"
+            echo "================= Recent PR merge detected. Checking if $BRANCH_NAME exists..."
+            log INFO "Checking if branch $BRANCH_NAME is in repo $REPO."
+            
+            # 2. Check if the target branch already exists
+            # BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
+            # if [ "$BRANCH_EXISTS" != "404" ]; then
+            #   echo "================= Branch $BRANCH_NAME already exists. Skipping."
+            #   log WARN "Branch $BRANCH_NAME already exists. Skipping."
+            #   continue
+            # fi
+
+            if gh api -H "Accept: application/vnd.github+json" \
+                  repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME \
+                  --silent >/dev/null 2>&1; then
+              echo "branch exists"
+              log WARN "Branch $BRANCH_NAME already exists. Skipping."
+            else
+              echo "branch missing"
+            fi
+            
+            # 3. Create the new branch from main
+            MAIN_SHA=$(gh api repos/$ORG_NAME/$REPO/git/ref/heads/main --jq '.object.sha' 2>/dev/null || echo "")
+            
+            if [ -z "$MAIN_SHA" ]; then
+              echo "================= Could not fetch main branch SHA. Skipping."
+              log ERROR "Could not fetch main branch SHA. Skipping."
+              continue
+            fi
+            
+            log INFO "Creating new branches for repositories with recent merges to main"
+            gh api --method POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              repos/$ORG_NAME/$REPO/git/refs \
+              -f ref="refs/heads/$BRANCH_NAME" \
+              -f sha="$MAIN_SHA" \
+              --silent
+            log INFO "Successfully created branch $BRANCH_NAME in $REPO."
+          done
+          log INFO "completed monthly branch creation process for repos with recent merges to main"
+          echo "::endgroup::"
