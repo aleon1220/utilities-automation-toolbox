@@ -5,6 +5,7 @@
 2. Generate high level reporting for the GitHub Orgs
 
 ### Design Monthly PR
+
 ```mermaid
 %%{init: { 'theme': 'forest' } }%%
 gitGraph
