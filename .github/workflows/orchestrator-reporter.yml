@@ -1,8 +1,9 @@
 name: Monthly Repo Reporter (Read-only)
 permissions:
+  # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#defining-access-for-the-github_token-scopes
+  actions: read
   contents: read
   pull-requests: read
-  metadata: read
 
 on:
   workflow_dispatch:
