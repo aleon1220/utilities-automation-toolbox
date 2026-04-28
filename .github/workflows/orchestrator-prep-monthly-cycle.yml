@@ -1,6 +1,9 @@
 name: Monthly Improvement Branch Creator
 
 on:
+  schedule:
+    # Runs at 00:00 on the 1st of every month to catch the previous month's branch
+    - cron: "0 0 1 * *"  
   workflow_dispatch: # Allows manual testing and execution
 
 jobs:
@@ -8,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5.0.1
 
       - name: Make logger readable
         run: chmod +r .github/scripts/logging.sh || true
