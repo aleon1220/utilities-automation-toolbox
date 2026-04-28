@@ -28,9 +28,9 @@ jobs:
         id: vars
         run: |
           source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-          log INFO "Checking if it is the first 5 days of the current month"
-          
+
           echo "::group::set up git branching metadata"
+          log INFO "Checking if it is the first 5 days of the current month"
           CURRENT_DAY=$(date +%d | sed 's/^0*//') # Strip leading zeros
           if [ "$CURRENT_DAY" -gt 5 ]; then
             log ERROR "automation only works within the first 5 days of the month"
@@ -57,14 +57,13 @@ jobs:
           source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
           
           echo "::group::assess repos with recent merges to main for branch creation"
-          log INFO "Starting monthly process: as within the last 30 days"
-          THIRTY_DAYS_AGO=$(date -d "30 days ago" +%s)
+          log INFO "Starting monthly process"
           REPOS=$(gh repo list $ORG_NAME --limit 1000 --no-archived --json name --jq '.[].name')
           log INFO "Repositories extracted"
           echo "::endgroup::"
 
-          echo "::group::creates new branches for repos with recent merges to main"
           echo "$REPOS" | while read -r REPO; do
+
             echo "================= Processing $ORG_NAME/$REPO"
             
             # 1. Check for recently merged PR to main
@@ -76,6 +75,9 @@ jobs:
             fi
             
             MERGE_SEC=$(date -d "$LAST_MERGED" +%s)
+
+            log "check for PRs within the last 30 days"
+            THIRTY_DAYS_AGO=$(date -d "30 days ago" +%s)
             if [ "$MERGE_SEC" -lt "$THIRTY_DAYS_AGO" ]; then
               echo "================= Most recent PR merge is older than 30 days. Skipping."
               log WARN "Most recent PR merge is older than 30 days. Skipping."
@@ -86,10 +88,9 @@ jobs:
             echo "================= Recent PR merge detected. Checking if $BRANCH_NAME exists..."
             log INFO "Checking if branch $BRANCH_NAME is in repo $REPO."
             
-            # 2. Check if the target branch already exists
+            # Check if the target branch already exists
             # BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
             # if [ "$BRANCH_EXISTS" != "404" ]; then
-            #   echo "================= Branch $BRANCH_NAME already exists. Skipping."
             #   log WARN "Branch $BRANCH_NAME already exists. Skipping."
             #   continue
             # fi
@@ -98,20 +99,22 @@ jobs:
                   repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME \
                   --silent >/dev/null 2>&1; then
               echo "branch exists"
-              log WARN "Branch $BRANCH_NAME already exists. Skipping."
+              log ERROR "Branch $BRANCH_NAME already exists."
+              log WARN "Skipping: Branch $BRANCH_NAME "
             else
-              echo "branch missing"
+              log "branch missing"
             fi
             
-            # 3. Create the new branch from main
+            echo "::group::creates new git branches from the main branch "
+            log INFO "monthly auto creation of branches for active repos"
             MAIN_SHA=$(gh api repos/$ORG_NAME/$REPO/git/ref/heads/main --jq '.object.sha' 2>/dev/null || echo "")
             
             if [ -z "$MAIN_SHA" ]; then
-              echo "================= Could not fetch main branch SHA. Skipping."
+              log WARN "================= Could not fetch main branch SHA. Skipping."
               log ERROR "Could not fetch main branch SHA. Skipping."
               continue
             fi
-            
+
             log INFO "Creating new branches for repositories with recent merges to main"
             gh api --method POST \
               -H "Accept: application/vnd.github+json" \
@@ -122,5 +125,18 @@ jobs:
               --silent
             log INFO "Successfully created branch $BRANCH_NAME in $REPO."
           done
-          log INFO "completed monthly branch creation process for repos with recent merges to main"
           echo "::endgroup::"
+
+          log INFO "completed monthly branch creation process for repos with recent merges to main"
+
+      - name: wrap up block
+        shell: bash
+        run: |
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+          echo "::group::gitHub group wrap up"
+          log INFO "wrap up workflow interaction"
+          log WARN "todo simplify this workflow execution"
+          log ERROR "todo: validations in one step, implementation other step"
+          echo "::endgroup::"
+          
+          log INFO "INFO color logging"          
