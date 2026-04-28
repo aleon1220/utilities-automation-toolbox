@@ -1,0 +1,153 @@
+name: "Report Repos"
+description: "Reports across repositories in an organization"
+inputs:
+  repo_filter:
+    description: "Optional substring to filter repositories"
+    required: false
+    default: ""
+  org_name:
+    description: "Organization name"
+    required: true
+  gh_token:
+    description: "GitHub token"
+    required: true
+outputs:
+  repo_count:
+    description: "Total number of repositories processed"
+    value: ${{ steps.report.outputs.count }}
+  repos_with_improvements:
+    description: "Number of repositories with improvement branches"
+    value: ${{ steps.report.outputs.improvements_count }}
+  status:
+    description: "Processing status (success/failure)"
+    value: ${{ steps.report.outputs.status }}
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs and setup
+      shell: bash
+      run: |
+        set -e
+
+        # Validate required inputs
+        if [ -z "${{ inputs.org_name }}" ]; then
+          echo "ERROR: org_name input is required"
+          exit 1
+        fi
+
+        if [ -z "${{ inputs.gh_token }}" ]; then
+          echo "ERROR: gh_token input is required"
+          exit 1
+        fi
+
+        # Make logger readable with error handling
+        if [ -f .github/scripts/logging.sh ]; then
+          chmod +r .github/scripts/logging.sh || true
+        else
+          echo "WARN: logging.sh not found, continuing without colored output"
+        fi
+    - name: Report across repositories (read-only)
+      id: report
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+        ORG_NAME: ${{ inputs.org_name }}
+        REPO_FILTER: ${{ inputs.repo_filter }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Source logging script with fallback
+        if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+        else
+          # Provide basic log function fallback
+          log() { echo "[$1] $2"; }
+        fi
+
+        REPOS_PROCESSED=0
+        REPOS_WITH_IMPROVEMENTS=0
+
+        echo "::group::Enumerate repositories"
+        log INFO "Listing non-archived repositories for $ORG_NAME"
+        REPOS=$(gh repo list "$ORG_NAME" --limit 1000 --no-archived --json name --jq '.[].name')
+        if [ -n "${REPO_FILTER:-}" ]; then
+          log INFO "Applying repo filter: ${REPO_FILTER}"
+          REPOS=$(echo "$REPOS" | grep -i "${REPO_FILTER}" || true)
+        fi
+        COUNT=$(echo "$REPOS" | sed '/^\s*$/d' | wc -l | tr -d ' ')
+        log INFO "Repository count: ${COUNT}"
+        echo "::endgroup::"
+
+        # Output count for workflow use
+        echo "count=${COUNT}" >> $GITHUB_OUTPUT
+
+        if [ -z "$REPOS" ] || [ "$COUNT" -eq 0 ]; then
+          log WARN "No repositories matched the selection. Exiting."
+          echo "improvements_count=0" >> $GITHUB_OUTPUT
+          echo "status=no_repos" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        echo "$REPOS" | while read -r REPO; do
+          [ -z "$REPO" ] && continue
+          ((REPOS_PROCESSED++))
+          echo "::group::Report for $ORG_NAME/$REPO"
+
+          # Validate repository access
+          if ! DEFAULT_BRANCH=$(gh api repos/$ORG_NAME/$REPO --jq '.default_branch' 2>/dev/null); then
+            log WARN "Failed to access repository $REPO. Skipping."
+            echo "::endgroup::"
+            continue
+          fi
+          
+          VISIBILITY=$(gh api repos/$ORG_NAME/$REPO --jq '.visibility' 2>/dev/null || echo "")
+
+          if [ -z "$DEFAULT_BRANCH" ]; then
+            log WARN "Could not determine default branch; skipping repository"
+            echo "::endgroup::"; continue
+          fi
+
+          if [ "$DEFAULT_BRANCH" != "main" ]; then
+            log WARN "Default branch is $DEFAULT_BRANCH (TODO: review base branch convention)"
+          fi
+
+          # Find all improvement branches
+          IMPROVEMENT_BRANCHES=$(gh api repos/$ORG_NAME/$REPO/branches?per_page=100 --paginate --jq '.[].name' 2>/dev/null | grep -Ei '\-improvements$' || true)
+
+          if [ -z "$IMPROVEMENT_BRANCHES" ]; then
+            log WARN "No *-improvements branches found"
+          else
+            ((REPOS_WITH_IMPROVEMENTS++))
+            # Sort branches descending (YYYY-MM prefix sorts well lexicographically)
+            echo "$IMPROVEMENT_BRANCHES" | sort -r | while read -r BR; do
+              [ -z "$BR" ] && continue
+              AHEAD_BY=$(gh api repos/$ORG_NAME/$REPO/compare/${DEFAULT_BRANCH}...${BR} --jq '.ahead_by' 2>/dev/null || echo "")
+              BEHIND_BY=$(gh api repos/$ORG_NAME/$REPO/compare/${DEFAULT_BRANCH}...${BR} --jq '.behind_by' 2>/dev/null || echo "")
+              SUMMARY="repo=$REPO base=$DEFAULT_BRANCH vis=$VISIBILITY branch=$BR ahead_by=${AHEAD_BY:-0} behind_by=${BEHIND_BY:-0}"
+              log INFO "$SUMMARY"
+            done
+          fi
+
+          LAST_MERGED=$(gh pr list -R $ORG_NAME/$REPO --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
+          log INFO "last_merged_into_base=${LAST_MERGED:-none}"
+          echo "::endgroup::"
+        done
+
+        # Output final metrics
+        echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> $GITHUB_OUTPUT
+        echo "status=success" >> $GITHUB_OUTPUT
+        log INFO "Processing complete: $REPOS_PROCESSED repos processed, $REPOS_WITH_IMPROVEMENTS with improvements"
+    - name: provide verbose output this repo debugging (read-only)
+      if: failure()
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+      shell: bash
+      run: |
+        if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+          log "================= Debugging output - GitHub API reference"
+        fi
+
+        log "================= GitHub API docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10"
+        log "================= Attempting verbose API call for branch diagnostics"
+        gh api --verbose "repos/${GITHUB_REPOSITORY}/branches" || echo "Verbose output unavailable"

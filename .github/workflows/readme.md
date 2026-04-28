@@ -1,4 +1,4 @@
-- centralized Orchestrator repository
+# Centralized Orchestrator repository
 
 ## User cases
 
@@ -75,8 +75,6 @@ gh auth status
     ```bash
     gh workflow list
     ```
-
-
 
 - List specific workflow by name
 
