@@ -28,7 +28,6 @@ jobs:
         id: vars
         run: |
           source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-
           echo "::group::set up git branching metadata"
           log INFO "Checking if it is the first 5 days of the current month"
           CURRENT_DAY=$(date +%d | sed 's/^0*//') # Strip leading zeros
@@ -75,9 +74,6 @@ jobs:
             fi
             
             MERGE_SEC=$(date -d "$LAST_MERGED" +%s)
-
-            log "check for PRs within the last 30 days"
-            THIRTY_DAYS_AGO=$(date -d "30 days ago" +%s)
             if [ "$MERGE_SEC" -lt "$THIRTY_DAYS_AGO" ]; then
               echo "================= Most recent PR merge is older than 30 days. Skipping."
               log WARN "Most recent PR merge is older than 30 days. Skipping."
@@ -88,7 +84,7 @@ jobs:
             echo "================= Recent PR merge detected. Checking if $BRANCH_NAME exists..."
             log INFO "Checking if branch $BRANCH_NAME is in repo $REPO."
             
-            # Check if the target branch already exists
+            # 2. Check if the target branch already exists
             # BRANCH_EXISTS=$(gh api repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME --jq '.name' 2>/dev/null || echo "404")
             # if [ "$BRANCH_EXISTS" != "404" ]; then
             #   log WARN "Branch $BRANCH_NAME already exists. Skipping."
