@@ -1,4 +1,4 @@
-# centralized Orchestrator repository
+- centralized Orchestrator repository
 
 ## User cases
 
@@ -52,19 +52,23 @@ gitGraph
 ### Prerequisites
 
 ```bash
-# Install GitHub CLI
-# https://cli.github.com/
+- Install GitHub CLI
+- https://cli.github.com/
 
-# Verify installation
+- Verify installation
 gh --version
 gh auth status
-gh auth login  # If needed
 ```
+
+- login If needed
+
+  ```bash
+  gh auth login
+  ```
 
 ### List & View Workflows
 
 #### List all workflows in the repository
-
 
 - List all workflows
 
@@ -72,21 +76,33 @@ gh auth login  # If needed
     gh workflow list
     ```
 
-```bash
 
-# List specific workflow by name
-gh workflow list --workflow="orchestrator-reporter"
-```
+
+- List specific workflow by name
+
+    ```bash
+    gh workflow list --workflow="orchestrator-reporter"
+    ```
+
+- action
+
+    ```bash
+
+    ```
 
 #### View workflow file content
 
-```bash
-# View workflow file
-gh workflow view orchestrator-reporter.yml
+- View workflow file
 
-# View with detailed information
-gh workflow view orchestrator-reporter.yml --json=content
-```
+    ```bash
+    gh workflow view orchestrator-reporter.yml
+    ```
+
+- View with detailed information
+
+    ```bash
+    gh workflow view orchestrator-reporter.yml --json=content
+    ```
 
 ### List & Monitor github Runs
 
@@ -98,30 +114,48 @@ gh workflow view orchestrator-reporter.yml --json=content
     gh run list --workflow="orchestrator-reporter.yml"
     ```
 
-```bash
+- List runs with limit
 
-# List runs with specific status
-gh run list --workflow="orchestrator-reporter.yml" --status=completed
-gh run list --workflow="orchestrator-reporter.yml" --status=failed
-gh run list --workflow="orchestrator-reporter.yml" --status=in_progress
+    ```bash
+    gh run list --workflow="orchestrator-reporter.yml" --limit=20
+    ```
 
-# List runs with limit
-gh run list --workflow="orchestrator-reporter.yml" --limit=20
+- List runs with JSON output for parsing
 
-# List runs with JSON output for parsing
-gh run list --workflow="orchestrator-reporter.yml" --json=status,conclusion,createdAt
-```
+    ```bash
+    gh run list --workflow="orchestrator-reporter.yml" --json=status,conclusion,createdAt
+    ```
+
+##### List runs with specific status
+
+- completed
+
+    ```bash
+    gh run list --workflow="orchestrator-reporter.yml" --status=completed
+    ```
+
+- failed runs
+
+    ```bash
+    gh run list --workflow="orchestrator-reporter.yml" --status=failed
+    ```
+
+- runs in progress
+
+    ```bash
+    gh run list --workflow="orchestrator-reporter.yml" --status=in_progress
+    ```
 
 #### View run details
 
 ```bash
-# View specific run details (use run ID from list)
+- View specific run details (use run ID from list)
 gh run view <RUN_ID>
 
-# View with detailed log output
+- View with detailed log output
 gh run view <RUN_ID> --log
 
-# View full verbose output
+- View full verbose output
 gh run view <RUN_ID> --log-failed
 ```
 
@@ -130,14 +164,14 @@ gh run view <RUN_ID> --log-failed
 #### Manually trigger a workflow with inputs
 
 ```bash
-# Trigger orchestrator-reporter with repo filter
+- Trigger orchestrator-reporter with repo filter
 gh workflow run orchestrator-reporter.yml \
   -f repo_filter="composite-app"
 
-# Trigger orchestrator-prep-monthly-cycle
+- Trigger orchestrator-prep-monthly-cycle
 gh workflow run orchestrator-prep-monthly-cycle.yml
 
-# Trigger add-collaborators workflow
+- Trigger add-collaborators workflow
 gh workflow run add-collaborators.yml \
   -f collaborator_type="user" \
   -f collaborator_name="username" \
@@ -150,17 +184,17 @@ gh workflow run add-collaborators.yml \
 #### Filter runs by various criteria
 
 ```bash
-# List runs from specific branch
+- List runs from specific branch
 gh run list --branch=main --workflow="orchestrator-reporter.yml"
 
-# List runs by actor (who triggered it)
+- List runs by actor (who triggered it)
 gh run list --actor="USERNAME" --workflow="orchestrator-reporter.yml"
 
-# List runs with head SHA
+- List runs with head SHA
 gh run list --workflow="orchestrator-reporter.yml" \
   --json=status,conclusion,headSha,createdAt
 
-# Complex JSON query
+- Complex JSON query
 gh run list --workflow="orchestrator-reporter.yml" --limit=50 \
   --json=databaseId,status,conclusion,createdAt,updatedAt,name,headBranch \
   --jq '.[] | select(.conclusion=="failure")'
@@ -171,27 +205,27 @@ gh run list --workflow="orchestrator-reporter.yml" --limit=50 \
 #### Download logs from a run
 
 ```bash
-# Download all logs from a run
+- Download all logs from a run
 gh run download <RUN_ID> --dir=./logs
 
-# View logs for specific step
+- View logs for specific step
 gh run view <RUN_ID> --log | grep "step_name"
 ```
 
 #### Check workflow syntax
 
 ```bash
-# Validate workflow file (requires workflow-run command)
-# Alternative: check GitHub UI or use local act tool
+- Validate workflow file (requires workflow-run command)
+- Alternative: check GitHub UI or use local act tool
 ```
 
 #### View job logs
 
 ```bash
-# List jobs in a run
+- List jobs in a run
 gh run view <RUN_ID> --json=jobs
 
-# View specific job output
+- View specific job output
 gh run view <RUN_ID> --json=jobs --jq '.jobs[] | select(.name=="job_name")'
 ```
 
@@ -200,16 +234,16 @@ gh run view <RUN_ID> --json=jobs --jq '.jobs[] | select(.name=="job_name")'
 #### Install and setup `act`
 
 ```bash
-# Install act (GitHub Actions local runner)
-# https://github.com/nektos/act
+- Install act (GitHub Actions local runner)
+- https://github.com/nektos/act
 
-# macOS with Homebrew
+- macOS with Homebrew
 brew install act
 
-# Windows with Scoop
+- Windows with Scoop
 scoop install act
 
-# Or download from releases
+- Or download from releases
 ```
 
 #### Run workflows locally `act`
@@ -222,24 +256,24 @@ scoop install act
 
 ```bash
 
-# Run default workflow
+- Run default workflow
 act
 
-# Run specific workflow
+- Run specific workflow
 act -j "report-all-repos"
 
-# Run with workflow dispatch inputs
+- Run with workflow dispatch inputs
 act workflow_dispatch \
   -i repo_filter="composite-app"
 
-# Run with secrets from environment
+- Run with secrets from environment
 act -s GH_TOKEN="ghp_xxxx" \
     -s ORG_LEVEL_TOKEN="ghp_xxxx"
 
-# Run with verbose output
+- Run with verbose output
 act -v
 
-# Run and keep job container after execution
+- Run and keep job container after execution
 act --reuse
 ```
 
@@ -274,43 +308,43 @@ gh run list --workflow="orchestrator-reporter.yml" --limit=10 \
 #### orchestrator-reporter.yml
 
 ```bash
-# List all runs
+- List all runs
 gh run list --workflow="orchestrator-reporter.yml"
 
-# Trigger manually
+- Trigger manually
 gh workflow run orchestrator-reporter.yml -f repo_filter="utilities"
 
-# View latest run
+- View latest run
 gh run view $(gh run list --workflow="orchestrator-reporter.yml" --json=databaseId --limit=1 --jq='.[0].databaseId')
 ```
 
 #### orchestrator-prep-monthly-cycle.yml
 
 ```bash
-# List all runs
+- List all runs
 gh run list --workflow="orchestrator-prep-monthly-cycle.yml"
 
-# Trigger manually (scheduled, can be run anytime)
+- Trigger manually (scheduled, can be run anytime)
 gh workflow run orchestrator-prep-monthly-cycle.yml
 
-# Check last run logs
+- Check last run logs
 gh run view $(gh run list --workflow="orchestrator-prep-monthly-cycle.yml" --json=databaseId --limit=1 --jq='.[0].databaseId') --log
 ```
 
 #### add-collaborators.yml
 
 ```bash
-# List all runs
+- List all runs
 gh run list --workflow="add-collaborators.yml"
 
-# Trigger with specific parameters
+- Trigger with specific parameters
 gh workflow run add-collaborators.yml \
   -f collaborator_type="user" \
   -f collaborator_name="john-doe" \
   -f target_repos="all" \
   -f permission="push"
 
-# Check run status
+- Check run status
 gh run view <RUN_ID> --log | grep -i "summary"
 ```
 
