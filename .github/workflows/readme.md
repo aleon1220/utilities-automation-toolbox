@@ -65,9 +65,14 @@ gh auth login  # If needed
 
 #### List all workflows in the repository
 
+
+- List all workflows
+
+    ```bash
+    gh workflow list
+    ```
+
 ```bash
-# List all workflows
-gh workflow list
 
 # List specific workflow by name
 gh workflow list --workflow="orchestrator-reporter"
@@ -87,9 +92,13 @@ gh workflow view orchestrator-reporter.yml --json=content
 
 #### List workflow runs
 
+- List all runs for a specific workflow
+
+    ```bash
+    gh run list --workflow="orchestrator-reporter.yml"
+    ```
+
 ```bash
-# List all runs for a specific workflow
-gh run list --workflow="orchestrator-reporter.yml"
 
 # List runs with specific status
 gh run list --workflow="orchestrator-reporter.yml" --status=completed
@@ -203,11 +212,15 @@ scoop install act
 # Or download from releases
 ```
 
-#### Run workflows locally
+#### Run workflows locally `act`
+
+- List available workflows locally
+
+    ```bash
+    act --list
+    ```
 
 ```bash
-# List available workflows locally
-act --list
 
 # Run default workflow
 act
