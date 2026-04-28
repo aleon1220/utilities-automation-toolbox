@@ -1,6 +1,9 @@
 name: Monthly Improvement Branch Creator
 
 on:
+  schedule:
+    # Runs at 00:00 on the 1st of every month to catch the previous month's branch
+    - cron: "0 0 1 * *"  
   workflow_dispatch: # Allows manual testing and execution
 
 jobs:
@@ -8,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5.0.1
+        # https://github.com/marketplace/actions/checkout
 
       - name: Make logger readable
         run: chmod +r .github/scripts/logging.sh || true
@@ -17,20 +21,24 @@ jobs:
         shell: bash
         run: |
           source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-          log INFO "github list branches in a group abstraction"
+          
           echo "::group::git branch list"
+          log INFO "github list branches in a group abstraction"
           git branch -a
           echo "::endgroup::"
           log WARN "Smoke test WARN color logging"
           log INFO "INFO color logging"
+          echo "::endgroup::"
 
       - name: Verify Date & Calculate Target Branch
         id: vars
         run: |
           source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+          
           echo "::group::set up git branching metadata"
           log INFO "Checking if it is the first 5 days of the current month"
           CURRENT_DAY=$(date +%d | sed 's/^0*//') # Strip leading zeros
+          
           if [ "$CURRENT_DAY" -gt 5 ]; then
             log ERROR "automation only works within the first 5 days of the month"
             exit 1
