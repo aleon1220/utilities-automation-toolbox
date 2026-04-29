@@ -46,7 +46,9 @@ runs:
         fi
 
         echo "::notice::✓ GitHub CLI authentication successful"
-        cat /tmp/auth_status.txt
+        echo "authenticated=true" >> $GITHUB_OUTPUT
+        echo "::notice::✓ Extracted key information and set GITHUB_OUTPUT"
+        echo "::endgroup::"
 
         # Extract token owner
         TOKEN_OWNER=$(gh auth status --show-token 2>/dev/null | grep "Logged in to" | awk '{print $4}' || echo "unknown")
@@ -54,7 +56,18 @@ runs:
         echo "authenticated=true" >> $GITHUB_OUTPUT
 
         # Get token scopes
-        TOKEN_SCOPES=$(gh api user --jq '.login' 2>/dev/null && echo "Token has repository access" || echo "Limited token scope")
-        echo "token_scopes=$TOKEN_SCOPES" >> $GITHUB_OUTPUT
+        TOKEN_SCOPES=$(gh api user --jq '.login' 2>/dev/null)
+        
+        if "$TOKEN_SCOPES"; then
+          TOKEN_SCOPES_MSG="Token has repository access"
+        else
+          TOKEN_SCOPES_MSG="Limited token scope"
+        fi
+        
+        echo "token_scopes=$TOKEN_SCOPES_MSG" >> $GITHUB_OUTPUT
+        echo "::notice::✓ Completed obtaining token_scopes to GITHUB_OUTPUT"
+        echo "::endgroup::"
 
+        echo "::group::Debug output TOKEN_SCOPES"
+        echo "$TOKEN_SCOPES"
         echo "::endgroup::"
