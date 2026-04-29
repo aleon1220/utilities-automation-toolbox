@@ -71,3 +71,57 @@ runs:
         echo "::group::Debug output TOKEN_SCOPES"
         echo "$TOKEN_SCOPES"
         echo "::endgroup::"
+
+    - name: Validate Token Permissions
+      id: validate_permissions
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+      run: |
+        set -e
+        
+        echo "::group::Validating Token Permissions"
+        
+        REQUIRED_SCOPES=("repo" "read:org" "workflow")
+        MISSING_SCOPES=()
+        
+        # Get token info to check scopes
+        TOKEN_INFO=$(gh auth status --show-token 2>&1 || true)
+        
+        echo "Token capabilities:"
+        
+        # Check for repo scope
+        if ! gh api repos/${{ github.repository_owner }} --silent 2>/dev/null; then
+          MISSING_SCOPES+=("repo")
+          echo "::warning::Missing 'repo' scope - cannot access repositories"
+        else
+          echo "::debug::✓ Has 'repo' scope"
+        fi
+        
+        if ! gh api orgs/${{ github.repository_owner }} --silent 2>/dev/null; then
+          MISSING_SCOPES+=("read:org")
+          echo "::warning::Missing 'read:org' scope - cannot read organization"
+        else
+          echo "::debug::✓ Has 'read:org' scope"
+        fi
+        echo "::notice::✓ Checked for org read scope"
+        
+        if ! gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/runs --silent 2>/dev/null; then
+          MISSING_SCOPES+=("workflow")
+          echo "::warning::Missing 'workflow' scope - cannot access workflows"
+        else
+          echo "::debug::✓ Has 'workflow' scope"
+        fi
+        
+        echo "::notice::✓ Checked for workflow scope"
+        
+        if [ ${#MISSING_SCOPES[@]} -gt 0 ]; then
+          echo "::error::Missing required scopes: ${MISSING_SCOPES[*]}"
+          echo "permissions_valid=false" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 1
+        fi
+        
+        echo "::notice::✓ All required token permissions validated successfully"
+        echo "permissions_valid=true" >> $GITHUB_OUTPUT
+        echo "::endgroup::"        
