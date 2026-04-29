@@ -46,7 +46,7 @@ runs:
         else
           echo "WARN: logging.sh not found, continuing without colored output"
         fi
-    - name: Report across repositories (read-only)
+    - name: Reporter across gitHub repositories
       id: report
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
@@ -95,7 +95,7 @@ runs:
 
           # Validate repository access
           if ! DEFAULT_BRANCH=$(gh api repos/$ORG_NAME/$REPO --jq '.default_branch' 2>/dev/null); then
-            log WARN "Failed to access repository $REPO. Skipping."
+            log WARN "Failed to access github repository $REPO. Skipping."
             echo "::endgroup::"
             continue
           fi
@@ -103,12 +103,12 @@ runs:
           VISIBILITY=$(gh api repos/$ORG_NAME/$REPO --jq '.visibility' 2>/dev/null || echo "")
 
           if [ -z "$DEFAULT_BRANCH" ]; then
-            log WARN "Could not determine default branch; skipping repository"
+            log ERROR "Could not determine default branch; skipping repository"
             echo "::endgroup::"; continue
           fi
 
           if [ "$DEFAULT_BRANCH" != "main" ]; then
-            log WARN "Default branch is $DEFAULT_BRANCH (TODO: review base branch convention)"
+            log WARN "for $REPO git Default branch is $DEFAULT_BRANCH TODO: review base branch convention"
           fi
 
           # Find all improvement branches
@@ -118,7 +118,8 @@ runs:
             log WARN "No *-improvements branches found"
           else
             ((REPOS_WITH_IMPROVEMENTS++))
-            # Sort branches descending (YYYY-MM prefix sorts well lexicographically)
+            log INFO "Sort branches descending (YYYY-MM prefix sorts well in sequence dictionary order)"
+            
             echo "$IMPROVEMENT_BRANCHES" | sort -r | while read -r BR; do
               [ -z "$BR" ] && continue
               AHEAD_BY=$(gh api repos/$ORG_NAME/$REPO/compare/${DEFAULT_BRANCH}...${BR} --jq '.ahead_by' 2>/dev/null || echo "")
@@ -129,7 +130,7 @@ runs:
           fi
 
           LAST_MERGED=$(gh pr list -R $ORG_NAME/$REPO --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
-          log INFO "last_merged_into_base=${LAST_MERGED:-none}"
+          log INFO "repo $REPO last_merged_into_base=${LAST_MERGED:-none}"
           echo "::endgroup::"
         done
 
@@ -137,17 +138,12 @@ runs:
         echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> $GITHUB_OUTPUT
         echo "status=success" >> $GITHUB_OUTPUT
         log INFO "Processing complete: $REPOS_PROCESSED repos processed, $REPOS_WITH_IMPROVEMENTS with improvements"
+
     - name: provide verbose output this repo debugging (read-only)
-      if: failure()
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
       shell: bash
       run: |
-        if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
-          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-          log "================= Debugging output - GitHub API reference"
-        fi
-
-        log "================= GitHub API docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10"
-        log "================= Attempting verbose API call for branch diagnostics"
+        echo "================= GitHub API docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10"
         gh api --verbose "repos/${GITHUB_REPOSITORY}/branches" || echo "Verbose output unavailable"
+        echo "================= completed verbose API call for branch diagnostics"
