@@ -1,1 +1,60 @@
-name: Validate GitHub Token\ndescription: Validates GitHub CLI authentication and token permissions\n\ninputs:\n  gh_token:\n    description: GitHub token for authentication\n    required: true\n\noutputs:\n  authenticated:\n    description: Whether the token is properly authenticated\n    value: ${{ steps.validate.outputs.authenticated }}\n  token_owner:\n    description: The owner/user associated with the token\n    value: ${{ steps.validate.outputs.token_owner }}\n  token_scopes:\n    description: The scopes associated with the token\n    value: ${{ steps.validate.outputs.token_scopes }}\n\nruns:\n  using: composite\n  steps:\n    - name: Validate GitHub Token\n      id: validate\n      shell: bash\n      env:\n        GH_TOKEN: ${{ inputs.gh_token }}\n      run: |\n        set -e\n        \n        echo "::group::Validating GitHub Token"\n        \n        # Check if token is set\n        if [ -z "$GH_TOKEN" ]; then\n          echo "::error::GitHub token is empty or not provided"\n          echo "authenticated=false" >> $GITHUB_OUTPUT\n          exit 1\n        fi\n        \n        # Attempt authentication\n        if ! gh auth status > /tmp/auth_status.txt 2>&1; then\n          echo "::error::GitHub CLI authentication failed"\n          cat /tmp/auth_status.txt\n          echo "authenticated=false" >> $GITHUB_OUTPUT\n          exit 1\n        fi\n        \n        echo "::notice::✓ GitHub CLI authentication successful"\n        cat /tmp/auth_status.txt\n        \n        # Extract token owner\n        TOKEN_OWNER=$(gh auth status --show-token 2>/dev/null | grep "Logged in to" | awk '{print $4}' || echo "unknown")\n        echo "token_owner=$TOKEN_OWNER" >> $GITHUB_OUTPUT\n        echo "authenticated=true" >> $GITHUB_OUTPUT\n        \n        # Get token scopes\n        TOKEN_SCOPES=$(gh api user --jq '.login' 2>/dev/null && echo "Token has repository access" || echo "Limited token scope")\n        echo "token_scopes=$TOKEN_SCOPES" >> $GITHUB_OUTPUT\n        \n        echo "::endgroup::"\n
+name: Validate GitHub Token
+description: Validates GitHub CLI authentication and token permissions
+
+inputs:
+  gh_token:
+    description: GitHub token for authentication
+    required: true
+
+outputs:
+  authenticated:
+    description: Whether the token is properly authenticated
+    value: ${{ steps.validate.outputs.authenticated }}
+  token_owner:
+    description: The owner/user associated with the token
+    value: ${{ steps.validate.outputs.token_owner }}
+  token_scopes:
+    description: The scopes associated with the token
+    value: ${{ steps.validate.outputs.token_scopes }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate GitHub Token
+      id: validate
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+      run: |
+        set -e
+
+        echo "::group::Validating GitHub Token"
+
+        # Check if token is set
+        if [ -z "$GH_TOKEN" ]; then
+          echo "::error::GitHub token is empty or not provided"
+          echo "authenticated=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        # Attempt authentication
+        if ! gh auth status > /tmp/auth_status.txt 2>&1; then
+          echo "::error::GitHub CLI authentication failed"
+          cat /tmp/auth_status.txt
+          echo "authenticated=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        echo "::notice::✓ GitHub CLI authentication successful"
+        cat /tmp/auth_status.txt
+
+        # Extract token owner
+        TOKEN_OWNER=$(gh auth status --show-token 2>/dev/null | grep "Logged in to" | awk '{print $4}' || echo "unknown")
+        echo "token_owner=$TOKEN_OWNER" >> $GITHUB_OUTPUT
+        echo "authenticated=true" >> $GITHUB_OUTPUT
+
+        # Get token scopes
+        TOKEN_SCOPES=$(gh api user --jq '.login' 2>/dev/null && echo "Token has repository access" || echo "Limited token scope")
+        echo "token_scopes=$TOKEN_SCOPES" >> $GITHUB_OUTPUT
+
+        echo "::endgroup::"
