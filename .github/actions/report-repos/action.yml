@@ -11,16 +11,19 @@ inputs:
   gh_token:
     description: "GitHub token"
     required: true
+
 outputs:
   repo_count:
     description: "Total number of repositories processed"
-    value: ${{ steps.report.outputs.count }}
+    value: ${{ steps.enumerate.outputs.count }}
   repos_with_improvements:
     description: "Number of repositories with improvement branches"
-    value: ${{ steps.report.outputs.improvements_count }}
+    # Fallback to 0 if the process step doesn't run
+    value: ${{ steps.process.outputs.improvements_count || '0' }} 
   status:
-    description: "Processing status (success/failure)"
-    value: ${{ steps.report.outputs.status }}
+    description: "Processing status (success/failure/no_repos)"
+    value: ${{ steps.process.outputs.status || steps.enumerate.outputs.status }}
+
 runs:
   using: "composite"
   steps:
@@ -46,8 +49,9 @@ runs:
         else
           echo "WARN: logging.sh not found, continuing without colored output"
         fi
-    - name: Reporter across gitHub repositories
-      id: report
+
+    - name: Enumerate repositories
+      id: enumerate
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
         ORG_NAME: ${{ inputs.org_name }}
@@ -55,26 +59,23 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        set -x  # Enable command echoing
-
+        
         # Source logging script with fallback
         if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
           source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
         else
-          # Provide basic log function fallback
           log() { echo "[$1] $2"; }
         fi
-
-        REPOS_PROCESSED=0
-        REPOS_WITH_IMPROVEMENTS=0
 
         echo "::group::Enumerate repositories"
         log INFO "Listing non-archived repositories for $ORG_NAME"
         REPOS=$(gh repo list "$ORG_NAME" --limit 1000 --no-archived --json name --jq '.[].name')
+        
         if [ -n "${REPO_FILTER:-}" ]; then
           log INFO "Applying repo filter: ${REPO_FILTER}"
           REPOS=$(echo "$REPOS" | grep -i "${REPO_FILTER}" || true)
         fi
+        
         COUNT=$(echo "$REPOS" | sed '/^\s*$/d' | wc -l | tr -d ' ')
         log INFO "Repository count: ${COUNT}"
         echo "::endgroup::"
@@ -82,46 +83,61 @@ runs:
         # Output count for workflow use
         echo "count=${COUNT}" >> $GITHUB_OUTPUT
 
+        # Handle empty results and write to file for the next step
         if [ -z "$REPOS" ] || [ "$COUNT" -eq 0 ]; then
-          log WARN "No repositories matched the selection. Exiting."
-          echo "improvements_count=0" >> $GITHUB_OUTPUT
+          log WARN "No repositories matched the selection."
           echo "status=no_repos" >> $GITHUB_OUTPUT
-          exit 0
+          touch repos_list.txt # Create empty file to prevent missing file errors
+        else
+          echo "$REPOS" > repos_list.txt
+          echo "status=has_repos" >> $GITHUB_OUTPUT
         fi
 
-        echo "$REPOS" | while read -r REPO; do
+    - name: Process and analyze repositories
+      id: process
+      # Only run this step if we actually found repositories
+      if: steps.enumerate.outputs.status == 'has_repos' 
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+        ORG_NAME: ${{ inputs.org_name }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        # Source logging script with fallback
+        if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+        else
+          log() { echo "[$1] $2"; }
+        fi
+
+        REPOS_PROCESSED=0
+        REPOS_WITH_IMPROVEMENTS=0
+
+        # Read the repositories from the file created in the previous step
+        while read -r REPO; do
           [ -z "$REPO" ] && continue
           ((REPOS_PROCESSED++))
           echo "::group::Report for $ORG_NAME/$REPO"
 
-          # Validate repository access
+          # Fetch default branch
+          DEFAULT_BRANCH=$(gh api repos/$ORG_NAME/$REPO --jq '.default_branch' 2>/dev/null || echo "")
           
-          DEFAULT_BRANCH=$(gh api repos/$ORG_NAME/$REPO --jq '.default_branch' 2>&1) || {
-            log ERROR "Failed to fetch default branch for $REPO: $DEFAULT_BRANCH"
-            echo "::endgroup::"
-            continue
-          }
-          
-          # Wrap gh API calls with better error handling
-          if ! "$DEFAULT_BRANCH" ; then
-            log WARN "Failed to access github repository $REPO. Skipping."
+          # Fix: Properly check if string is empty rather than executing the string
+          if [ -z "$DEFAULT_BRANCH" ]; then
+            log ERROR "Failed to fetch default branch or access repository $REPO. Skipping."
             echo "::endgroup::"
             continue
           fi
           
           VISIBILITY=$(gh api repos/$ORG_NAME/$REPO --jq '.visibility' 2>/dev/null || echo "")
 
-          if [ -z "$DEFAULT_BRANCH" ]; then
-            log ERROR "Could not determine default branch; skipping repository"
-            echo "::endgroup::"; continue
-          fi
-
           if [ "$DEFAULT_BRANCH" != "main" ]; then
             log WARN "for $REPO git Default branch is $DEFAULT_BRANCH TODO: review base branch convention"
           fi
 
-          # Find all improvement branches
           IMPROVEMENT_BRANCHES=$(gh api repos/$ORG_NAME/$REPO/branches?per_page=100 --paginate --jq '.[].name' 2>/dev/null | grep -Ei '\-improvements$' || true)
+          log "Found all yyyy-mm-improvement branches"
 
           if [ -z "$IMPROVEMENT_BRANCHES" ]; then
             log WARN "No *-improvements branches found"
@@ -141,14 +157,14 @@ runs:
           LAST_MERGED=$(gh pr list -R $ORG_NAME/$REPO --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
           log INFO "repo $REPO last_merged_into_base=${LAST_MERGED:-none}"
           echo "::endgroup::"
-        done
+        done < repos_list.txt
 
         # Output final metrics
         echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> $GITHUB_OUTPUT
         echo "status=success" >> $GITHUB_OUTPUT
         log INFO "Processing complete: $REPOS_PROCESSED repos processed, $REPOS_WITH_IMPROVEMENTS with improvements"
 
-    - name: provide verbose output this repo debugging (read-only)
+    - name: Provide verbose output for repo debugging (read-only)
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
       shell: bash
