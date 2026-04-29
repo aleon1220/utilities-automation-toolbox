@@ -16,6 +16,9 @@ outputs:
   token_scopes:
     description: The scopes associated with the token
     value: ${{ steps.validate.outputs.token_scopes }}
+  permissions_valid:
+    description: required token permissions are present
+    value: ${{ steps.validate_permissions.outputs.permissions_valid }}
 
 runs:
   using: composite
