@@ -55,6 +55,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        set -x  # Enable command echoing
 
         # Source logging script with fallback
         if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
@@ -94,7 +95,15 @@ runs:
           echo "::group::Report for $ORG_NAME/$REPO"
 
           # Validate repository access
-          if ! DEFAULT_BRANCH=$(gh api repos/$ORG_NAME/$REPO --jq '.default_branch' 2>/dev/null); then
+          
+          DEFAULT_BRANCH=$(gh api repos/$ORG_NAME/$REPO --jq '.default_branch' 2>&1) || {
+            log ERROR "Failed to fetch default branch for $REPO: $DEFAULT_BRANCH"
+            echo "::endgroup::"
+            continue
+          }
+          
+          # Wrap gh API calls with better error handling
+          if ! "$DEFAULT_BRANCH" ; then
             log WARN "Failed to access github repository $REPO. Skipping."
             echo "::endgroup::"
             continue
