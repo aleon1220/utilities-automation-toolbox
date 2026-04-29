@@ -1,4 +1,4 @@
-name: Repos Reporter (Read-only)
+name: Github Repos Reporter
 permissions:
   # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#defining-access-for-the-github_token-scopes
   actions: read
