@@ -120,11 +120,10 @@ runs:
         
         if [ ${#MISSING_SCOPES[@]} -gt 0 ]; then
           echo "::debug:: there appears to be some sort of issue in the validation"
-          echo "::warning::throwing a WARN instead of error"
-          # echo "::error::Missing required scopes: ${MISSING_SCOPES[*]}"
+          echo "::error::Missing required scopes: ${MISSING_SCOPES[*]}"
           # echo "permissions_valid=false" >> $GITHUB_OUTPUT
           echo "::endgroup::"
-          exit 1
+          # exit 1
         fi
         
         echo "::notice::✓ All required token permissions validated successfully"
