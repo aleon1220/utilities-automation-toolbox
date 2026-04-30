@@ -14,11 +14,13 @@ uses the format **File Name Format yyyy-MM-dd-EEEE.md** Example: `2026-03-17-Tue
 
 The tool uses **Picocli** to accept command‑line arguments:
 
-| Option          | Description                   |
-| --------------- | ----------------------------- |
-| `--start`, `-s` | Start date (LocalDate format) |
-| `--end`, `-e`   | End date (LocalDate format)   |
-| `--help`, `-h`  | Displays the help message     |
+| Option              | Description                                                                     |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `--start`, `-s`     | Start date (YYYY-MM-DD format)                                                  |
+| `--end`, `-e`       | End date (YYYY-MM-DD format)                                                    |
+| `--this-week`, `-t` | Automatically creates logs from the start of this business week to the end      |
+| `--dryrun`, `-d`    | Safely execute and mock the execution without creating any files                |
+| `--help`, `-h`      | Displays the help message                                                       |
 
 ***
 
@@ -79,6 +81,18 @@ END_DATE="2026-03-21"
 gradle run --args="--start $START_DATE --end $END_DATE"
 ```
 
+#### **Run For This Week (Auto Date Calculation)**
+
+```bash
+gradle run --args="--this-week"
+```
+
+#### **Run With Dry Run (Mock Execution)**
+
+```bash
+gradle run --args="--start $START_DATE --end $END_DATE --dryrun"
+```
+
 ***
 
 ## 🚀 Release Execution
@@ -111,6 +125,12 @@ END_DATE="2026-03-21"
 
 ```bash
 java -jar appJavaUtils-all.jar --start $START_DATE --end $END_DATE
+```
+
+* execute utility for this week safely using dry-run
+
+```bash
+java -jar appJavaUtils-all.jar --this-week --dryrun
 ```
 
 ### Testing suite
