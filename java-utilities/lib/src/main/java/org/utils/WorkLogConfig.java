@@ -43,6 +43,9 @@ public class WorkLogConfig implements Runnable {
     @Option(names = { "-t", "--this-week" }, description = "creates from the business day of this week to the end of this week")
     boolean thisWeek;
 
+    @Option(names = { "-d", "--dryrun" }, description = "safely execute and mock the execution")
+    boolean dryrun;
+
     @Option(names = { "-h", "--help" }, usageHelp = true, description = "worklog Show this help message and exit")
     boolean help;
 
@@ -97,6 +100,9 @@ public class WorkLogConfig implements Runnable {
         }
 
         try {
+            if (dryrun) {
+                System.out.println("======= DRY RUN MODE ENABLED =======");
+            }
             Path outputDir = resolveOutputDirectory();
             for (LocalDate date = startDate.get(); !date.isAfter(endDate.get()); date = date.plusDays(1)) {
 
@@ -113,6 +119,14 @@ public class WorkLogConfig implements Runnable {
                 var standardizedDateName = formatDateForFileName(date);
                 String fileName = standardizedDateName + ".md";
                 Path filePath = outputDir.resolve(fileName);
+
+                if (dryrun) {
+                    System.out.printf("======= 🛠️ [DRY RUN] Would create file %s at path %s %n", fileName, filePath);
+                    if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                        System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n", fileName);
+                    }
+                    continue;
+                }
 
                 var template = loadResource("templates/worklog-day.md");
                 var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
@@ -231,10 +245,15 @@ public class WorkLogConfig implements Runnable {
 
     // todo: add logs that show the output directory and file names being
     // created for better visibility and debugging
-    private static Path resolveOutputDirectory() {
+    private Path resolveOutputDirectory() {
         String base = "/mnt/c/workspace/TESTS";
         String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
         Path dir = Path.of(base, today);
+
+        if (dryrun) {
+            System.out.println("======= 🛠️ [DRY RUN] Would ensure output directory exists: " + dir);
+            return dir;
+        }
 
         try {
             Files.createDirectories(dir);
