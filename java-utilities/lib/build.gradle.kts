@@ -52,3 +52,9 @@ java {
         languageVersion = JavaLanguageVersion.of(25)
     }
 }
+
+tasks.withType<Jar> {
+    // Enable reproducible archives for consistent DevOps artifact generation
+    isReproducibleFileOrder = true
+    preserveFileTimestamps = false
+}
