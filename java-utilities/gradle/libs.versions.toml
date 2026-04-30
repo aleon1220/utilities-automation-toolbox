@@ -4,6 +4,8 @@
 [versions]
 commons-math3 = "3.6.1"
 guava = "33.4.6-jre"
+jreleaser = "1.23.0"
+upcoming4j = "0.0.4"
 shadow = "9.3.2"
 picocli = "4.7.5"
 
@@ -15,3 +17,5 @@ picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "pico
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+jreleaser = { id = "org.jreleaser", version.ref = "jreleaser" }
+upcoming4j = { id = "io.github.sttamper.upcoming4j", version.ref = "upcoming4j" }
