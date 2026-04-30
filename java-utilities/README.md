@@ -112,3 +112,9 @@ END_DATE="2026-03-21"
 ```bash
 java -jar appJavaUtils-all.jar --start $START_DATE --end $END_DATE
 ```
+
+### Testing suite
+
+```bash
+./gradlew test --tests "org.utils.WorkLogConfigTest" --info | grep "testDryRun"
+```
