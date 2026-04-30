@@ -34,11 +34,14 @@ import picocli.CommandLine.Option;
 }, sortOptions = false, requiredOptionMarker = '*', showDefaultValues = true)
 
 public class WorkLogConfig implements Runnable {
-    @Option(names = { "-s", "--start" }, description = "Start date YYYY-MM-DD", required = true)
+    @Option(names = { "-s", "--start" }, description = "Start date YYYY-MM-DD")
     Optional<LocalDate> startDate = Optional.empty();
 
-    @Option(names = { "-e", "--end" }, description = "End date", required = true)
+    @Option(names = { "-e", "--end" }, description = "End date")
     Optional<LocalDate> endDate = Optional.empty();
+
+    @Option(names = { "-t", "--this-week" }, description = "creates from the business day of this week to the end of this week")
+    boolean thisWeek;
 
     @Option(names = { "-h", "--help" }, usageHelp = true, description = "worklog Show this help message and exit")
     boolean help;
@@ -207,8 +210,17 @@ public class WorkLogConfig implements Runnable {
     // todo: understand this override
     @Override
     public void run() {
+        if (thisWeek) {
+            LocalDate now = LocalDate.now();
+            startDate = Optional.of(now.with(DayOfWeek.MONDAY));
+            endDate = Optional.of(now.with(DayOfWeek.FRIDAY));
+        }
+
         if (startDate.isPresent() && endDate.isPresent()) {
             createMarkdownFiles();
+        } else {
+            System.out.println("======= Start and end dates are required or use --this-week");
+            new CommandLine(this).usage(System.out);
         }
     }
 
