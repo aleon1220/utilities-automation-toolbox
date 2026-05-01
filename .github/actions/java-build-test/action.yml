@@ -27,6 +27,8 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        gradle --version
+        gradle wrapper
         chmod +x gradlew
+        echo "checking location $PWD"
+        ls -lha 
         ./gradlew clean build shadowJar
