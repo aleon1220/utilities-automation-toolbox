@@ -1,6 +1,8 @@
 # java-utilities
 
-a java CLI app with some operations i run on-demand, weekly or randomly.
+A collection of Java CLI utilities designed to automate repetitive tasks. This project is part of the `utilities-automation-toolbox` and provides a set of operations that can be run on-demand, weekly, or randomly to streamline developer workflows.
+
+Currently, the primary tool included is the **WorkLog markdown generator**, which automates the creation of daily work logs.
 
 ## WorkLog markdown
 
@@ -42,7 +44,17 @@ The utility generates **one `.md` file per business day** within the given date 
 
 ***
 
-## 🚀  Executing the Java utilities
+## 📋 Prerequisites
+
+Before building or running the utilities, ensure you have the following installed:
+
+*   **Java JDK 25**: The project uses Java 25 toolchain features.
+*   **Gradle**: While the project includes a Gradle wrapper (`gradlew`), having Gradle installed locally can be helpful.
+*   **WSL (Optional)**: Highly recommended if you are developing on Windows 11, as the scripts and commands are optimized for a Linux-like environment (e.g., Ubuntu 24).
+
+***
+
+## 🚀 Executing the Java utilities
 
 ### Release Execution Fat Jar
 
@@ -115,12 +127,25 @@ gradle run --args="--start $START_DATE --end $END_DATE --dryrun"
 
 ***
 
-## CI with github actions
+## ⚙️ CI with GitHub Actions
 
-### Testing suite
+The project includes a CI pipeline to ensure code quality and functionality. The workflow is designed to validate changes through automated testing.
 
-#### Smoke test
+### Testing Suite
+
+The testing suite focuses on verifying the core logic of the utilities without side effects (using dry runs).
+
+#### Smoke Test Execution
+
+The smoke test validates the CLI configuration and basic execution flow:
 
 ```bash
 ./gradlew test --tests "org.utils.WorkLogConfigTest" --info | grep "testDryRun"
 ```
+
+The CI pipeline typically performs the following steps:
+
+1. **Checkout Code**: Pulls the latest version of the repository.
+2. **Setup Java**: Configures the environment with JDK 25.
+3. **Build**: Compiles the code and generates the Fat JAR.
+4. **Test**: Runs the unit tests and reports results.
