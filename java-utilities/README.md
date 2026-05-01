@@ -1,5 +1,9 @@
 # java-utilities
 
+A collection of Java CLI utilities designed to automate repetitive tasks. This project is part of the `utilities-automation-toolbox` and provides a set of operations that can be run on-demand, weekly, or randomly to streamline developer workflows.
+
+Currently, the primary tool included is the **WorkLog markdown generator**, which automates the creation of daily work logs.
+
 ## WorkLog markdown
 
 WorkLog is a Picocli-based CLI automation tool that generates daily markdown worklog files between a start and end date.
@@ -40,9 +44,47 @@ The utility generates **one `.md` file per business day** within the given date 
 
 ***
 
-## Executing the utilities
+## 📋 Prerequisites
 
-### 🧪 Unit Test Build & Run
+Before building or running the utilities, ensure you have the following installed:
+
+*   **Java JDK 25**: The project uses Java 25 toolchain features.
+*   **Gradle**: While the project includes a Gradle wrapper (`gradlew`), having Gradle installed locally can be helpful.
+*   **WSL (Optional)**: Highly recommended if you are developing on Windows 11, as the scripts and commands are optimized for a Linux-like environment (e.g., Ubuntu 24).
+
+***
+
+## 🚀 Executing the Java utilities
+
+### Release Execution Fat Jar
+
+simplified local build with the gradle wrapper to fix a specific gradle version
+
+* build Fat jar
+
+```bash
+./gradlew clean build shadowJar
+```
+
+* output location `ls -lha lib/build/libs/`
+* the java archie with all dependencies fat/uber JAR is `appJavaUtils-all.jar`
+* copy file to execution sandbox if using WSL from Windows11
+
+```bash
+EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
+pushd $EXECUTION_SANDBOX
+```
+
+* smoke test the execution
+
+```bash
+java -jar appJavaUtils-all.jar --this-week --dryrun
+```
+
+### 🧪 local Development Unit Test Build & Run
+
+perform the steps locally for development purposes. I used WSL ubuntu 24 running from an enterprise windows11.
 
 * navigate to gradle project directory
 
@@ -75,19 +117,9 @@ START_DATE="2026-03-10"
 END_DATE="2026-03-21"
 ```
 
-#### **Run With Dates**
-
-```bash
-gradle run --args="--start $START_DATE --end $END_DATE"
-```
-
-#### **Run For This Week (Auto Date Calculation)**
-
-```bash
-gradle run --args="--this-week"
-```
-
 #### **Run With Dry Run (Mock Execution)**
+
+calculates starting the first business day of the week.
 
 ```bash
 gradle run --args="--start $START_DATE --end $END_DATE --dryrun"
@@ -95,46 +127,25 @@ gradle run --args="--start $START_DATE --end $END_DATE --dryrun"
 
 ***
 
-## 🚀 Release Execution
+## ⚙️ CI with GitHub Actions
 
-* build Fat jar
+The project includes a CI pipeline to ensure code quality and functionality. The workflow is designed to validate changes through automated testing.
 
-```bash
-./gradlew clean build shadowJar
-```
+### Testing Suite
 
-* After building your fat/uber JAR `appJavaUtils-all.jar`
-* location `./lib/build/libs/`
-* copy file to execution sandbox using WSL from Windows11
+The testing suite focuses on verifying the core logic of the utilities without side effects (using dry runs).
 
-```bash
-EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
-cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
-```
+#### Smoke Test Execution
 
-### Execution
-
-* set dates
-
-```bash
-START_DATE="2026-03-10"
-END_DATE="2026-03-21"
-```
-
-* execute utility to create markdown files
-
-```bash
-java -jar appJavaUtils-all.jar --start $START_DATE --end $END_DATE
-```
-
-* execute utility for this week safely using dry-run
-
-```bash
-java -jar appJavaUtils-all.jar --this-week --dryrun
-```
-
-### Testing suite
+The smoke test validates the CLI configuration and basic execution flow:
 
 ```bash
 ./gradlew test --tests "org.utils.WorkLogConfigTest" --info | grep "testDryRun"
 ```
+
+The CI pipeline typically performs the following steps:
+
+1. **Checkout Code**: Pulls the latest version of the repository.
+2. **Setup Java**: Configures the environment with JDK 25.
+3. **Build**: Compiles the code and generates the Fat JAR.
+4. **Test**: Runs the unit tests and reports results.
