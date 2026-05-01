@@ -1,0 +1,61 @@
+name: Java Utilities CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'java-utilities/**'
+      - '.github/workflows/ci-cd-java-utilities.yml'
+      - '.github/actions/java-build-test/**'
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'java-utilities/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write # Needed for creating GitHub Releases
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Java Utilities
+        uses: ./.github/actions/java-build-test
+        with:
+          java-version: '25'
+          working-directory: 'java-utilities'
+
+      - name: Upload Fat JAR Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appJavaUtils-all.jar
+          path: java-utilities/lib/build/libs/appJavaUtils-all.jar
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Fat JAR Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: appJavaUtils-all.jar
+          path: .
+
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: appJavaUtils-all.jar
