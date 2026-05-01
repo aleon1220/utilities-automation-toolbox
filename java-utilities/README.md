@@ -1,5 +1,7 @@
 # java-utilities
 
+a java CLI app with some operations i run on-demand, weekly or randomly.
+
 ## WorkLog markdown
 
 WorkLog is a Picocli-based CLI automation tool that generates daily markdown worklog files between a start and end date.
@@ -40,9 +42,37 @@ The utility generates **one `.md` file per business day** within the given date 
 
 ***
 
-## Executing the utilities
+## 🚀  Executing the Java utilities
 
-### 🧪 Unit Test Build & Run
+### Release Execution Fat Jar
+
+simplified local build with the gradle wrapper to fix a specific gradle version
+
+* build Fat jar
+
+```bash
+./gradlew clean build shadowJar
+```
+
+* output location `ls -lha lib/build/libs/`
+* the java archie with all dependencies fat/uber JAR is `appJavaUtils-all.jar`
+* copy file to execution sandbox if using WSL from Windows11
+
+```bash
+EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
+pushd $EXECUTION_SANDBOX
+```
+
+* smoke test the execution
+
+```bash
+java -jar appJavaUtils-all.jar --this-week --dryrun
+```
+
+### 🧪 local Development Unit Test Build & Run
+
+perform the steps locally for development purposes. I used WSL ubuntu 24 running from an enterprise windows11.
 
 * navigate to gradle project directory
 
@@ -75,19 +105,9 @@ START_DATE="2026-03-10"
 END_DATE="2026-03-21"
 ```
 
-#### **Run With Dates**
-
-```bash
-gradle run --args="--start $START_DATE --end $END_DATE"
-```
-
-#### **Run For This Week (Auto Date Calculation)**
-
-```bash
-gradle run --args="--this-week"
-```
-
 #### **Run With Dry Run (Mock Execution)**
+
+calculates starting the first business day of the week.
 
 ```bash
 gradle run --args="--start $START_DATE --end $END_DATE --dryrun"
@@ -95,45 +115,11 @@ gradle run --args="--start $START_DATE --end $END_DATE --dryrun"
 
 ***
 
-## 🚀 Release Execution
-
-* build Fat jar
-
-```bash
-./gradlew clean build shadowJar
-```
-
-* After building your fat/uber JAR `appJavaUtils-all.jar`
-* location `./lib/build/libs/`
-* copy file to execution sandbox using WSL from Windows11
-
-```bash
-EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
-cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
-```
-
-### Execution
-
-* set dates
-
-```bash
-START_DATE="2026-03-10"
-END_DATE="2026-03-21"
-```
-
-* execute utility to create markdown files
-
-```bash
-java -jar appJavaUtils-all.jar --start $START_DATE --end $END_DATE
-```
-
-* execute utility for this week safely using dry-run
-
-```bash
-java -jar appJavaUtils-all.jar --this-week --dryrun
-```
+## CI with github actions
 
 ### Testing suite
+
+#### Smoke test
 
 ```bash
 ./gradlew test --tests "org.utils.WorkLogConfigTest" --info | grep "testDryRun"
