@@ -4,11 +4,9 @@
 package org.utils;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
-
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import java.time.LocalDate;
-
-import org.utils.WorkLogConfig;
+import java.util.Optional;
 
 class WorkLogConfigTest {
     @Test
@@ -23,5 +21,24 @@ class WorkLogConfigTest {
             // Tell reflection exactly what parameters to look for
             WorkLogConfig.class.getDeclaredMethod("isValidDateRange", LocalDate.class, LocalDate.class);
         }, "The method isValidDateRange(LocalDate, LocalDate) should exist in WorkLogConfig");
+    }
+
+    @Test
+    void testDryRunExecutionWithThisWeek() {
+        WorkLogConfig classUnderTest = new WorkLogConfig();
+        classUnderTest.dryrun = true;
+        classUnderTest.thisWeek = true;
+        
+        assertDoesNotThrow(() -> classUnderTest.run(), "run() with dryrun and thisWeek should execute without throwing an exception");
+    }
+
+    @Test
+    void testDryRunExecutionWithExplicitDates() {
+        WorkLogConfig classUnderTest = new WorkLogConfig();
+        classUnderTest.dryrun = true;
+        classUnderTest.startDate = Optional.of(LocalDate.of(2026, 3, 1));
+        classUnderTest.endDate = Optional.of(LocalDate.of(2026, 3, 31));
+        
+        assertDoesNotThrow(() -> classUnderTest.run(), "run() with dryrun and explicit dates should execute without throwing an exception");
     }
 }

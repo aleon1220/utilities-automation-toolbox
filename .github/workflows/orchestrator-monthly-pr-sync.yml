@@ -1,0 +1,94 @@
+name: Monthly Branch Improvement Sync
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  schedule:
+    # Runs at 00:00 on the 1st of every month to catch the previous month's branch
+    - cron: "0 0 1 * *"
+  workflow_dispatch: # Allows manual testing
+
+jobs:
+  create-monthly-sync-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Calculate Target Branch Name
+        id: vars
+        shell: bash
+        run: |
+          # Run date once and extract components
+          BASE_DATE=$(date -d "last month" +%Y-%m-%B)
+          YEAR=$(echo $BASE_DATE | cut -d'-' -f1)
+          MONTH_NUM=$(echo $BASE_DATE | cut -d'-' -f2)
+          MONTH_NAME=$(echo $BASE_DATE | cut -d'-' -f3 | tr '[:upper:]' '[:lower:]')
+          echo "branch_pattern=${YEAR}-${MONTH_NUM}-${MONTH_NAME}-improvements" >> $GITHUB_OUTPUT
+
+      - name: Process GitHub Repositories
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
+          BRANCH_NAME: ${{ steps.vars.outputs.branch_pattern }}
+          ORG_NAME: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          echo "================= Listing non-archived repositories for $ORG_NAME"
+          REPOS=$(gh repo list "$ORG_NAME" --limit 1000 --no-archived --json name --jq '.[].name')
+
+          echo "$REPOS" | while IFS= read -r REPO; do
+            echo "================= Checking $ORG_NAME/$REPO for branch $BRANCH_NAME"
+
+            BRANCH_GEN_AI=$(gh api "repos/$ORG_NAME/$REPO/branches/$BRANCH_NAME" --jq '.name' 2>/dev/null || echo "404")
+
+            if [ "$BRANCH_GEN_AI" != "404" ]; then
+              COMMITS_AHEAD=$(gh api "repos/$ORG_NAME/$REPO/compare/main...$BRANCH_NAME" --jq '.ahead_by' 2>/dev/null || echo "0")
+
+              if [ "${COMMITS_AHEAD:-0}" -gt 0 ]; then
+                echo "Branch found with updates. Checking for existing PR..."
+                PR_EXISTS=$(gh pr list -R "$ORG_NAME/$REPO" -H "$BRANCH_NAME" --json number --jq '.[0].number')
+
+                if [ -z "$PR_EXISTS" ]; then
+                  gh label create "automated-pr" \
+                    --color "#ededed" \
+                    --description "GitHub Actions Automated PRs" \
+                    --repo "$ORG_NAME/$REPO" 2>/dev/null || true
+
+                  echo "::group::Assigning reviewer permissions and creating PR"
+                  echo "Granting pull permission to reviewer 'Matet17' (if needed)..."
+                  gh api --method PUT \
+                    -H "Accept: application/vnd.github+json" \
+                    "repos/$ORG_NAME/$REPO/collaborators/Matet17" \
+                    -f permission=pull >/dev/null 2>&1 || true
+
+                  gh pr create \
+                    --repo "$ORG_NAME/$REPO" \
+                    --base main \
+                    --head "$BRANCH_NAME" \
+                    --label "automated-pr" \
+                    --title "Monthly Improvements: $BRANCH_NAME" \
+                    --body "Automated PR to merge monthly improvements from $BRANCH_NAME into main." \
+                    --reviewer "Matet17"
+
+                  echo "PR created for $REPO."
+                  echo "::endgroup::"
+                else
+                  echo "PR already exists (#$PR_EXISTS). Skipping."
+                fi
+              else
+                echo "Branch exists but has no commits ahead of main. Skipping."
+              fi
+            else
+              echo "No improvement branch found for $REPO. Skipping..."
+            fi
+          done
+
+      - name: Provide verbose output for this repo (debugging)
+        env:
+          GH_TOKEN: ${{ secrets.ORG_LEVEL_TOKEN }}
+        shell: bash
+        run: |
+          echo "================= Docs: https://docs.github.com/en/rest"
+          echo "================= Listing branches for ${GITHUB_REPOSITORY}"
+          gh api "repos/${GITHUB_REPOSITORY}/branches" --paginate --json name --jq '.[].name' || true

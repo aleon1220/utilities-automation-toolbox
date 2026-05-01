@@ -1,0 +1,25 @@
+jreleaser {
+    project {
+        name = 'java-utilities'
+        authors = ['aleon1220']
+        license = 'Apache-2.0'
+        versionPattern = 'SEMVER'
+        inceptionYear = '2024'
+    }
+
+    release {
+        github {
+            enabled = true
+            repoOwner = 'aleon1220'
+            update {
+                enabled = true
+            }
+            changelog {
+                enabled = true
+                formatted = 'ALWAYS'
+                preset = 'conventional-commits'
+                format = '- {{commitShortHash}} {{commitTitle}}'
+            }
+        }
+    }
+}
