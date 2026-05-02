@@ -1,6 +1,6 @@
+name: Smoke Test github actions workflow
 # Smoke test GitHub Actions in main branch basic workflow manually triggered
-
-name: Manual workflow
+# todo: add smoke test of composite functions and reusable workflows
 
 # Controls when the action will run. Workflow runs when manually triggered using the UI
 # or API.
@@ -12,7 +12,7 @@ on:
         # Friendly description to be shown in the UI instead of 'name'
         description: 'Person to greet'
         # Default value if no value is explicitly provided
-        default: 'World of Automation and software people'
+        default: 'automation and software people'
         required: true
         # The data type of the input
         type: string
