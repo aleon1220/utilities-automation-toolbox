@@ -118,7 +118,10 @@ runs:
         if [ -s "$RUNNER_TEMP/repos_all.txt" ]; then
           if [ -n "${REPO_FILTER:-}" ]; then
             log INFO "Applying repo filter: ${REPO_FILTER}"
-            grep -i "${REPO_FILTER}" "$RUNNER_TEMP/repos_all.txt" || true > "$RUNNER_TEMP/repos.txt"
+            # Write grep results to repos.txt regardless of match results; avoid option parsing with leading '-'
+            if ! grep -i -- "${REPO_FILTER}" "$RUNNER_TEMP/repos_all.txt" > "$RUNNER_TEMP/repos.txt"; then
+              true # allow no matches without failing the step
+            fi
           else
             cp "$RUNNER_TEMP/repos_all.txt" "$RUNNER_TEMP/repos.txt"
           fi
@@ -133,7 +136,7 @@ runs:
         else
           echo "status=has_repos" >> "$GITHUB_OUTPUT"
         fi
-        log "finished step Enumerate selection"
+        log INFO "finished step Enumerate selection"
 
     - name: Initialize metrics when no repos
       id: init_metrics
@@ -157,7 +160,7 @@ runs:
         REPOS_PROCESSED=0
         REPOS_WITH_IMPROVEMENTS=0
 
-        log "Starting processing of repositories"
+        log INFO "Starting processing of repositories"
 
         while read -r REPO; do
           [ -z "$REPO" ] && continue
@@ -180,7 +183,8 @@ runs:
           # Fetch branches and filter by pattern
           ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
           if [ -n "${BRANCH_PATTERN:-}" ]; then
-            IMPROVEMENT_BRANCHES=$(printf "%s\n" "$ALL_BRANCHES" | grep -E "${BRANCH_PATTERN}" || true)
+            # Use -- to avoid option parsing when pattern starts with '-'
+            IMPROVEMENT_BRANCHES=$(printf "%s\n" "$ALL_BRANCHES" | grep -E -- "${BRANCH_PATTERN}" || true)
           else
             IMPROVEMENT_BRANCHES=""
           fi
@@ -208,7 +212,7 @@ runs:
         echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
         echo "status=success" >> "$GITHUB_OUTPUT"
         log INFO "Processing complete: ${REPOS_PROCESSED} repos processed, ${REPOS_WITH_IMPROVEMENTS} with improvements"
-        log "finished processing git repositories"
+        log INFO "finished processing git repositories"
 
 
     - name: Summary (has repos)
