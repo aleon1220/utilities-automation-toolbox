@@ -164,7 +164,8 @@ runs:
 
         while IFS= read -r REPO; do
           [ -z "$REPO" ] && continue
-          ((REPOS_PROCESSED++))
+          # FIX: Replaced post-increment to prevent exit code 1 when value is 0
+          REPOS_PROCESSED=$((REPOS_PROCESSED + 1))
           log INFO "Phase 1: Processing repository #${REPOS_PROCESSED}: ${REPO}"
 
           log DEBUG "Phase 1: Fetching metadata for ${REPO}"
@@ -207,7 +208,8 @@ runs:
 
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
           [ -z "$REPO" ] && continue
-          ((REPOS_CHECKED++))
+          REPOS_CHECKED=$((REPOS_CHECKED + 1))
+          log DEBUG "Fixed Safe arithmetic addition"
           log DEBUG "Phase 2: Fetching branches for ${REPO}"
 
           ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
