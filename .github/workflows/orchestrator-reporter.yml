@@ -12,6 +12,10 @@ on:
         description: "Optional substring to filter repositories (case-insensitive)"
         required: false
         type: string
+      debug:
+        description: "Enable debug logging"
+        required: false
+        type: boolean
 
 jobs:
   report-all-repos:

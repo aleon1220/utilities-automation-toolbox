@@ -2,15 +2,23 @@ name: "Report Repos"
 description: "Reports across repositories in an organization"
 inputs:
   repo_filter:
-    description: "Optional substring to filter repositories"
+    description: "Optional substring to filter repositories (case-insensitive)"
     required: false
     default: ""
+  branch_pattern:
+    description: "Regex for improvement branches (grep -E)"
+    required: false
+    default: "-improvements$"
   org_name:
     description: "Organization name"
     required: true
   gh_token:
     description: "GitHub token"
     required: true
+  debug:
+    description: "Enable extra diagnostics (verbose gh api call)"
+    required: false
+    default: "false"
 
 outputs:
   repo_count:
@@ -18,8 +26,7 @@ outputs:
     value: ${{ steps.enumerate.outputs.count }}
   repos_with_improvements:
     description: "Number of repositories with improvement branches"
-    # Fallback to 0 if the process step doesn't run
-    value: ${{ steps.process.outputs.improvements_count || '0' }} 
+    value: ${{ steps.process.outputs.improvements_count || '0' }}
   status:
     description: "Processing status (success/failure/no_repos)"
     value: ${{ steps.process.outputs.status || steps.enumerate.outputs.status }}
@@ -27,148 +34,340 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Validate inputs and setup
+    - name: Validate required inputs
       shell: bash
       run: |
-        set -e
-
-        # Validate required inputs
+        set -Eeuo pipefail
         if [ -z "${{ inputs.org_name }}" ]; then
-          echo "ERROR: org_name input is required"
+          echo "ERROR: org_name input is required" >&2
           exit 1
         fi
-
         if [ -z "${{ inputs.gh_token }}" ]; then
-          echo "ERROR: gh_token input is required"
+          echo "ERROR: gh_token input is required" >&2
           exit 1
         fi
 
-        # Make logger readable with error handling
-        if [ -f .github/scripts/logging.sh ]; then
-          chmod +r .github/scripts/logging.sh || true
-        else
-          echo "WARN: logging.sh not found, continuing without colored output"
-        fi
-
-    - name: Enumerate repositories
-      id: enumerate
+    - name: Check GitHub CLI and auth
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        if ! gh --version >/dev/null 2>&1; then
+          echo "ERROR: GitHub CLI 'gh' is not available in PATH" >&2
+          exit 1
+        fi
+        if ! gh auth status -t >/dev/null 2>&1; then
+          echo "ERROR: 'gh' authentication not initialized or token invalid" >&2
+          echo "Ensure 'gh_token' is a valid token with required scopes." >&2
+          exit 1
+        fi
+
+        echo "finished step GitHub CLI & auth"
+
+    - name: Bootstrap bash environment (BASH_ENV)
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        ENV_FILE="$RUNNER_TEMP/bash_env"
+
+        cat >"$ENV_FILE" <<'EOF'
+        set -Eeuo pipefail
+        IFS=$'\n\t'
+        # Avoid interactive pagers
+        export GIT_PAGER=
+        # Reusable logger
+        if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
+          # shellcheck source=/dev/null
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+        else
+          log() {
+            local level="${1:-INFO}"; shift
+            printf "[%s] %s\n" "$level" "$*"
+          }
+        fi
+        EOF
+        echo "BASH_ENV=$ENV_FILE" >> "$GITHUB_ENV"
+        echo "Created a shared bash init file sourced automatically by all subsequent bash steps"
+
+    - name: List repositories
+      id: list
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+        ORG_NAME: ${{ inputs.org_name }}
+      shell: bash
+      run: |
+        # log is available via BASH_ENV
+        log INFO "Listing non-archived repositories for ${ORG_NAME}"
+        REPOS=$(gh repo list "$ORG_NAME" --limit 1000 --no-archived --json name --jq '.[].name')
+        # Write raw list (may include empty if org has zero)
+        printf "%s\n" "$REPOS" > "$RUNNER_TEMP/repos_all.txt"
+        ALL_COUNT=$(sed '/^\s*$/d' "$RUNNER_TEMP/repos_all.txt" | wc -l | tr -d ' ')
+        log INFO "Total repositories returned: ${ALL_COUNT}"
+        echo "all_count=${ALL_COUNT}" >> "$GITHUB_OUTPUT"
+
+    - name: Enumerate selection (apply filter and set outputs)
+      id: enumerate
+      env:
         ORG_NAME: ${{ inputs.org_name }}
         REPO_FILTER: ${{ inputs.repo_filter }}
       shell: bash
       run: |
-        set -euo pipefail
-        
-        # Source logging script with fallback
-        if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
-          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-        else
-          log() { echo "[$1] $2"; }
+        set -Eeuo pipefail
+        : > "$RUNNER_TEMP/repos.txt"
+        if [ -s "$RUNNER_TEMP/repos_all.txt" ]; then
+          if [ -n "${REPO_FILTER:-}" ]; then
+            log INFO "Applying repo filter: ${REPO_FILTER}"
+            # Write grep results to repos.txt regardless of match results; avoid option parsing with leading '-'
+            if ! grep -i -- "${REPO_FILTER}" "$RUNNER_TEMP/repos_all.txt" > "$RUNNER_TEMP/repos.txt"; then
+              true # allow no matches without failing the step
+            fi
+          else
+            cp "$RUNNER_TEMP/repos_all.txt" "$RUNNER_TEMP/repos.txt"
+          fi
         fi
+        COUNT=$(sed '/^\s*$/d' "$RUNNER_TEMP/repos.txt" | wc -l | tr -d ' ')
+        log INFO "Selected repository count: ${COUNT}"
+        echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
 
-        echo "::group::Enumerate repositories"
-        log INFO "Listing non-archived repositories for $ORG_NAME"
-        REPOS=$(gh repo list "$ORG_NAME" --limit 1000 --no-archived --json name --jq '.[].name')
-        
-        if [ -n "${REPO_FILTER:-}" ]; then
-          log INFO "Applying repo filter: ${REPO_FILTER}"
-          REPOS=$(echo "$REPOS" | grep -i "${REPO_FILTER}" || true)
-        fi
-        
-        COUNT=$(echo "$REPOS" | sed '/^\s*$/d' | wc -l | tr -d ' ')
-        log INFO "Repository count: ${COUNT}"
-        echo "::endgroup::"
-
-        # Output count for workflow use
-        echo "count=${COUNT}" >> $GITHUB_OUTPUT
-
-        # Handle empty results and write to file for the next step
-        if [ -z "$REPOS" ] || [ "$COUNT" -eq 0 ]; then
+        if [ "$COUNT" -eq 0 ]; then
           log WARN "No repositories matched the selection."
-          echo "status=no_repos" >> $GITHUB_OUTPUT
-          touch repos_list.txt # Create empty file to prevent missing file errors
+          echo "status=no_repos" >> "$GITHUB_OUTPUT"
         else
-          echo "$REPOS" > repos_list.txt
-          echo "status=has_repos" >> $GITHUB_OUTPUT
+          echo "status=has_repos" >> "$GITHUB_OUTPUT"
         fi
+        log INFO "finished step Enumerate selection"
 
-    - name: Process and analyze repositories
-      id: process
-      # Only run this step if we actually found repositories
-      if: steps.enumerate.outputs.status == 'has_repos' 
+    - name: Initialize metrics when no repos
+      id: init_metrics
+      if: steps.enumerate.outputs.status == 'no_repos'
+      shell: bash
+      run: |
+        echo "improvements_count=0" >> "$GITHUB_OUTPUT"
+        echo "status=no_repos" >> "$GITHUB_OUTPUT"
+        log INFO "Initialized metrics for empty selection (no_repos)"
+
+    - name: Process repos - Phase 1 - Collect repository metadata
+      id: phase1_metadata
+      if: steps.enumerate.outputs.status == 'has_repos'
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
         ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
-        set -euo pipefail
-        
-        # Source logging script with fallback
-        if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
-          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-        else
-          log() { echo "[$1] $2"; }
-        fi
-
+        set -Eeuo pipefail
         REPOS_PROCESSED=0
-        REPOS_WITH_IMPROVEMENTS=0
 
-        # Read the repositories from the file created in the previous step
-        while read -r REPO; do
+        log INFO "Phase 1: Starting repository metadata collection"
+        METADATA_FILE="$RUNNER_TEMP/repos_metadata.txt"
+        : > "$METADATA_FILE"
+
+        while IFS= read -r REPO; do
           [ -z "$REPO" ] && continue
-          ((REPOS_PROCESSED++))
-          echo "::group::Report for $ORG_NAME/$REPO"
+          # FIX: Replaced post-increment to prevent exit code 1 when value is 0
+          REPOS_PROCESSED=$((REPOS_PROCESSED + 1))
+          log INFO "Phase 1: Processing repository #${REPOS_PROCESSED}: ${REPO}"
 
-          # Fetch default branch
-          DEFAULT_BRANCH=$(gh api repos/$ORG_NAME/$REPO --jq '.default_branch' 2>/dev/null || echo "")
+          log DEBUG "Phase 1: Fetching metadata for ${REPO}"
+          DEFAULT_BRANCH=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.default_branch' 2>/dev/null || echo "")
           
-          # Fix: Properly check if string is empty rather than executing the string
           if [ -z "$DEFAULT_BRANCH" ]; then
-            log ERROR "Failed to fetch default branch or access repository $REPO. Skipping."
-            echo "::endgroup::"
+            log ERROR "Phase 1: Failed to fetch default branch for ${REPO}. Skipping."
             continue
           fi
-          
-          VISIBILITY=$(gh api repos/$ORG_NAME/$REPO --jq '.visibility' 2>/dev/null || echo "")
+
+          VISIBILITY=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.visibility' 2>/dev/null || echo "")
+          log INFO "Phase 1: Repository ${REPO} - branch=${DEFAULT_BRANCH} visibility=${VISIBILITY}"
 
           if [ "$DEFAULT_BRANCH" != "main" ]; then
-            log WARN "for $REPO git Default branch is $DEFAULT_BRANCH TODO: review base branch convention"
+            log WARN "Phase 1: Repository ${REPO} uses non-standard default branch: ${DEFAULT_BRANCH}"
           fi
 
-          IMPROVEMENT_BRANCHES=$(gh api repos/$ORG_NAME/$REPO/branches?per_page=100 --paginate --jq '.[].name' 2>/dev/null | grep -Ei '\-improvements$' || true)
-          log "Found all yyyy-mm-improvement branches"
+          echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}" >> "$METADATA_FILE"
+        done < "$RUNNER_TEMP/repos.txt"
+
+        log INFO "Phase 1 completed: ${REPOS_PROCESSED} repositories processed"
+        echo "repos_processed=${REPOS_PROCESSED}" >> "$GITHUB_OUTPUT"
+
+    - name: Process repos - Phase 2 - Fetch branches and filter improvements
+      id: phase2_branches
+      if: steps.enumerate.outputs.status == 'has_repos'
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+        ORG_NAME: ${{ inputs.org_name }}
+        BRANCH_PATTERN: ${{ inputs.branch_pattern }}
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        REPOS_CHECKED=0
+        REPOS_WITH_IMPROVEMENTS=0
+
+        log INFO "Phase 2: Starting branch filtering"
+        BRANCHES_FILE="$RUNNER_TEMP/improvement_branches.txt"
+        : > "$BRANCHES_FILE"
+
+        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
+          [ -z "$REPO" ] && continue
+          REPOS_CHECKED=$((REPOS_CHECKED + 1))
+          log DEBUG "Phase 2: Fetching branches for ${REPO}"
+
+          ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
+          BRANCH_COUNT=$(printf "%s\n" "$ALL_BRANCHES" | sed '/^\s*$/d' | wc -l | tr -d ' ')
+          log INFO "Phase 2: Repository ${REPO} has ${BRANCH_COUNT} total branches"
+
+          if [ -n "${BRANCH_PATTERN:-}" ]; then
+            IMPROVEMENT_BRANCHES=$(printf "%s\n" "$ALL_BRANCHES" | grep -E -- "${BRANCH_PATTERN}" || true)
+          else
+            IMPROVEMENT_BRANCHES=""
+          fi
 
           if [ -z "$IMPROVEMENT_BRANCHES" ]; then
-            log WARN "No *-improvements branches found"
+            log DEBUG "Phase 2: No improvement branches found in ${REPO} for pattern: ${BRANCH_PATTERN}"
           else
-            ((REPOS_WITH_IMPROVEMENTS++))
-            log INFO "Sort branches descending (YYYY-MM prefix sorts well in sequence dictionary order)"
-            
-            echo "$IMPROVEMENT_BRANCHES" | sort -r | while read -r BR; do
+            REPOS_WITH_IMPROVEMENTS=$((REPOS_WITH_IMPROVEMENTS + 1))
+            log INFO "Phase 2: Repository ${REPO} has improvement branches"
+            log DEBUG "Fixed Safe arithmetic addition"
+
+            while read -r BR; do
               [ -z "$BR" ] && continue
-              AHEAD_BY=$(gh api repos/$ORG_NAME/$REPO/compare/${DEFAULT_BRANCH}...${BR} --jq '.ahead_by' 2>/dev/null || echo "")
-              BEHIND_BY=$(gh api repos/$ORG_NAME/$REPO/compare/${DEFAULT_BRANCH}...${BR} --jq '.behind_by' 2>/dev/null || echo "")
-              SUMMARY="repo=$REPO base=$DEFAULT_BRANCH vis=$VISIBILITY branch=$BR ahead_by=${AHEAD_BY:-0} behind_by=${BEHIND_BY:-0}"
-              log INFO "$SUMMARY"
-            done
+              echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}" >> "$BRANCHES_FILE"
+            done < <(printf "%s\n" "$IMPROVEMENT_BRANCHES" | sort -r)
+          fi
+        done < "$RUNNER_TEMP/repos_metadata.txt"
+
+        echo "repos_with_improvements=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
+        log INFO "Phase 2 completed: ${REPOS_CHECKED} repos checked, ${REPOS_WITH_IMPROVEMENTS} with improvements"
+
+    - name: Process repos - Phase 3 - Analyze branch comparisons
+      id: phase3_comparisons
+      if: steps.phase2_branches.outputs.repos_with_improvements != '0'
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+        ORG_NAME: ${{ inputs.org_name }}
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        BRANCHES_ANALYZED=0
+
+        log INFO "Phase 3: Starting branch comparison analysis"
+        COMPARISON_FILE="$RUNNER_TEMP/branch_comparisons.txt"
+        : > "$COMPARISON_FILE"
+
+        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR; do
+          [ -z "$REPO" ] && continue
+          BRANCHES_ANALYZED=$((BRANCHES_ANALYZED + 1))
+          
+          log DEBUG "Phase 3: Analyzing branch ${BR} in ${REPO}"
+          AHEAD_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "0")
+          BEHIND_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.behind_by' 2>/dev/null || echo "0")
+          
+          log INFO "Phase 3: Branch comparison - repo=${REPO} base=${DEFAULT_BRANCH} branch=${BR} ahead=${AHEAD_BY} behind=${BEHIND_BY}"
+          echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${AHEAD_BY}|${BEHIND_BY}" >> "$COMPARISON_FILE"
+        done < "$RUNNER_TEMP/improvement_branches.txt"
+
+        echo "branches_analyzed=${BRANCHES_ANALYZED}" >> "$GITHUB_OUTPUT"
+        log INFO "Phase 3 completed: total ${BRANCHES_ANALYZED} github branches analyzed"
+
+    - name: Process repos - Phase 4 - Collect merge history
+      id: phase4_merges
+      if: steps.enumerate.outputs.status == 'has_repos'
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+        ORG_NAME: ${{ inputs.org_name }}
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        REPOS_MERGED_CHECKED=0
+
+        log INFO "Phase 4: Starting merge history collection"
+        MERGE_FILE="$RUNNER_TEMP/merge_history.txt"
+        : > "$MERGE_FILE"
+
+        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
+          [ -z "$REPO" ] && continue
+          REPOS_MERGED_CHECKED=$((REPOS_MERGED_CHECKED + 1))
+
+          log DEBUG "Phase 4: Fetching merge history for ${REPO}"
+          LAST_MERGED=$(gh pr list -R "${ORG_NAME}/${REPO}" --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
+          
+          if [ -z "$LAST_MERGED" ]; then
+            log INFO "Phase 4: No merged PRs found for ${REPO} into ${DEFAULT_BRANCH}"
+            LAST_MERGED="none"
+          else
+            log INFO "Phase 4: Last merged PR for ${REPO}: ${LAST_MERGED}"
           fi
 
-          LAST_MERGED=$(gh pr list -R $ORG_NAME/$REPO --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
-          log INFO "repo $REPO last_merged_into_base=${LAST_MERGED:-none}"
-          echo "::endgroup::"
-        done < repos_list.txt
+          echo "${REPO}|${LAST_MERGED}" >> "$MERGE_FILE"
+        done < "$RUNNER_TEMP/repos_metadata.txt"
+        
+        echo "repos_checked=${REPOS_MERGED_CHECKED}" >> "$GITHUB_OUTPUT"
+        log INFO "Phase 4 completed: ${REPOS_MERGED_CHECKED} repositories checked for merge history"
 
-        # Output final metrics
-        echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> $GITHUB_OUTPUT
-        echo "status=success" >> $GITHUB_OUTPUT
-        log INFO "Processing complete: $REPOS_PROCESSED repos processed, $REPOS_WITH_IMPROVEMENTS with improvements"
+    - name: Process repos - Phase 5 - Aggregate results generate reports
+      id: process
+      if: steps.enumerate.outputs.status == 'has_repos'
+      shell: bash
+      run: |
+        set -Eeuo pipefail
 
-    - name: Provide verbose output for repo debugging (read-only)
+        log INFO "Phase 5: Starting results aggregation"
+
+        REPOS_PROCESSED=${{ steps.phase1_metadata.outputs.repos_processed || '0' }}
+        REPOS_WITH_IMPROVEMENTS=${{ steps.phase2_branches.outputs.repos_with_improvements || '0' }}
+        BRANCHES_ANALYZED=${{ steps.phase3_comparisons.outputs.branches_analyzed || '0' }}
+
+        log INFO "Phase 5: Preparing comprehensive summary"
+        log INFO "Phase 5: Total repositories processed: ${REPOS_PROCESSED}"
+        log INFO "Phase 5: Repositories with improvements: ${REPOS_WITH_IMPROVEMENTS}"
+        log INFO "Phase 5: Branches analyzed: ${BRANCHES_ANALYZED}"
+
+        if [ -f "$RUNNER_TEMP/branch_comparisons.txt" ]; then
+          log DEBUG "Phase 5: Generating comparison details report"
+          while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR AHEAD BEHIND; do
+            [ -z "$REPO" ] && continue
+            echo "::group::Report for ${REPO}/${BR}"
+            log INFO "Comparison: repo=${REPO} base=${DEFAULT_BRANCH} branch=${BR} ahead=${AHEAD} behind=${BEHIND}"
+            echo "::endgroup::"
+          done < "$RUNNER_TEMP/branch_comparisons.txt"
+        fi
+
+        log INFO "Phase 5: Compiling final outputs"
+        echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
+        echo "status=success" >> "$GITHUB_OUTPUT"
+        log INFO "Phase 5 completed: Results aggregation finished"
+        log INFO "Processing workflow completed successfully"
+
+    - name: Summary with Github repos
+      if: steps.enumerate.outputs.status == 'has_repos'
+      shell: bash
+      run: |
+        COUNT="${{ steps.enumerate.outputs.count }}"
+        IMP="${{ steps.process.outputs.improvements_count }}"
+        {
+          echo "### Report Repos Summary"
+          echo ""
+          echo "- Org: ${{ inputs.org_name }}"
+          echo "- Selected repos: ${COUNT}"
+          echo "- Repos with improvement branches: ${IMP}"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Summary No repos
+      if: steps.enumerate.outputs.status == 'no_repos'
+      shell: bash
+      run: |
+        {
+          echo "### Report Repos Summary"
+          echo ""
+          echo "- Org: ${{ inputs.org_name }}"
+          echo "- No repositories matched the selection."
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Diagnostics (optional, read-only)
+      if: ${{ inputs.debug == 'true' }}
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
       shell: bash
       run: |
-        echo "================= GitHub API docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10"
+        echo "================= GitHub REST API docs: https://docs.github.com/en/rest"
         gh api --verbose "repos/${GITHUB_REPOSITORY}/branches" || echo "Verbose output unavailable"
-        echo "================= completed verbose API call for branch diagnostics"
+        echo "================= completed verbose API call for branch diagnostics repo ${GITHUB_REPOSITORY}"
