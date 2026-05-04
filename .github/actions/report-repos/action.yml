@@ -162,12 +162,17 @@ runs:
 
         log INFO "Starting processing of repositories"
 
-        while read -r REPO; do
+        while IFS= read -r REPO; do
+          log DEBUG "Checking raw field splitting for REPO"
           [ -z "$REPO" ] && continue
           ((REPOS_PROCESSED++))
+          log DEBUG "Processing repository #${REPOS_PROCESSED}: ${REPO}"
+
           echo "::group::Report for ${ORG_NAME}/${REPO}"
 
           DEFAULT_BRANCH=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.default_branch' 2>/dev/null || echo "")
+          log INFO "obtained default branch for ${REPO}: ${DEFAULT_BRANCH}"
+          
           if [ -z "$DEFAULT_BRANCH" ]; then
             log ERROR "Failed to fetch default branch or access repository ${REPO}. Skipping."
             echo "::endgroup::"
@@ -180,8 +185,11 @@ runs:
             log WARN "for ${REPO} git Default branch is ${DEFAULT_BRANCH} TODO: review base branch convention"
           fi
 
-          # Fetch branches and filter by pattern
           ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
+          log INFO "Fetched all branches for ${REPO} "
+          count=$(echo "$ALL_BRANCHES" | wc -l)
+          log INFO "Total branches in ${REPO}: ${count}"
+          
           if [ -n "${BRANCH_PATTERN:-}" ]; then
             # Use -- to avoid option parsing when pattern starts with '-'
             IMPROVEMENT_BRANCHES=$(printf "%s\n" "$ALL_BRANCHES" | grep -E -- "${BRANCH_PATTERN}" || true)
