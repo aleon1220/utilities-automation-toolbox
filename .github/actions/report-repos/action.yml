@@ -68,25 +68,25 @@ runs:
       run: |
         set -Eeuo pipefail
         ENV_FILE="$RUNNER_TEMP/bash_env"
-        # Create a shared bash init file sourced automatically by all subsequent bash steps
+
         cat >"$ENV_FILE" <<'EOF'
-set -Eeuo pipefail
-IFS=$'\n\t'
-# Avoid interactive pagers
-export GH_PAGER=
-export GIT_PAGER=
-# Reusable logger
-if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
-  # shellcheck source=/dev/null
-  source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
-else
-  log() {
-    local level="${1:-INFO}"; shift
-    printf "[%s] %s\n" "$level" "$*"
-  }
-fi
-EOF
+        set -Eeuo pipefail
+        IFS=$'\n\t'
+        # Avoid interactive pagers
+        export GIT_PAGER=
+        # Reusable logger
+        if [ -f "${GITHUB_WORKSPACE}/.github/scripts/logging.sh" ]; then
+          # shellcheck source=/dev/null
+          source "${GITHUB_WORKSPACE}/.github/scripts/logging.sh"
+        else
+          log() {
+            local level="${1:-INFO}"; shift
+            printf "[%s] %s\n" "$level" "$*"
+          }
+        fi
+        EOF
         echo "BASH_ENV=$ENV_FILE" >> "$GITHUB_ENV"
+        echo "Created a shared bash init file sourced automatically by all subsequent bash steps"
 
     - name: List repositories
       id: list
