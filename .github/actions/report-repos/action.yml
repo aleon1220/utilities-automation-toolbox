@@ -124,6 +124,7 @@ runs:
         COUNT=$(sed '/^\s*$/d' "$RUNNER_TEMP/repos.txt" | wc -l | tr -d ' ')
         log INFO "Selected repository count: ${COUNT}"
         echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+
         if [ "$COUNT" -eq 0 ]; then
           log WARN "No repositories matched the selection."
           echo "status=no_repos" >> "$GITHUB_OUTPUT"
@@ -153,53 +154,53 @@ runs:
         REPOS_PROCESSED=0
         REPOS_WITH_IMPROVEMENTS=0
 
-        while read -r REPO; do
-          [ -z "$REPO" ] && continue
-          ((REPOS_PROCESSED++))
-          echo "::group::Report for ${ORG_NAME}/${REPO}"
+        # while read -r REPO; do
+        #   [ -z "$REPO" ] && continue
+        #   ((REPOS_PROCESSED++))
+        #   echo "::group::Report for ${ORG_NAME}/${REPO}"
 
-          DEFAULT_BRANCH=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.default_branch' 2>/dev/null || echo "")
-          if [ -z "$DEFAULT_BRANCH" ]; then
-            log ERROR "Failed to fetch default branch or access repository ${REPO}. Skipping."
-            echo "::endgroup::"
-            continue
-          fi
+        #   DEFAULT_BRANCH=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.default_branch' 2>/dev/null || echo "")
+        #   if [ -z "$DEFAULT_BRANCH" ]; then
+        #     log ERROR "Failed to fetch default branch or access repository ${REPO}. Skipping."
+        #     echo "::endgroup::"
+        #     continue
+        #   fi
 
-          VISIBILITY=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.visibility' 2>/dev/null || echo "")
+        #   VISIBILITY=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.visibility' 2>/dev/null || echo "")
 
-          if [ "$DEFAULT_BRANCH" != "main" ]; then
-            log WARN "for ${REPO} git Default branch is ${DEFAULT_BRANCH} TODO: review base branch convention"
-          fi
+        #   if [ "$DEFAULT_BRANCH" != "main" ]; then
+        #     log WARN "for ${REPO} git Default branch is ${DEFAULT_BRANCH} TODO: review base branch convention"
+        #   fi
 
-          # Fetch branches and filter by pattern
-          ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
-          if [ -n "${BRANCH_PATTERN:-}" ]; then
-            IMPROVEMENT_BRANCHES=$(printf "%s\n" "$ALL_BRANCHES" | grep -E "${BRANCH_PATTERN}" || true)
-          else
-            IMPROVEMENT_BRANCHES=""
-          fi
-          log INFO "Found all improvement-like branches (pattern='${BRANCH_PATTERN}')"
+        #   # Fetch branches and filter by pattern
+        #   ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
+        #   if [ -n "${BRANCH_PATTERN:-}" ]; then
+        #     IMPROVEMENT_BRANCHES=$(printf "%s\n" "$ALL_BRANCHES" | grep -E "${BRANCH_PATTERN}" || true)
+        #   else
+        #     IMPROVEMENT_BRANCHES=""
+        #   fi
+        #   log INFO "Found all improvement-like branches (pattern='${BRANCH_PATTERN}')"
 
-          if [ -z "$IMPROVEMENT_BRANCHES" ]; then
-            log WARN "No branches matched pattern"
-          else
-            ((REPOS_WITH_IMPROVEMENTS++))
-            log INFO "Sort branches descending (YYYY-MM prefix sorts well in dictionary order)"
-            printf "%s\n" "$IMPROVEMENT_BRANCHES" | sort -r | while read -r BR; do
-              [ -z "$BR" ] && continue
-              AHEAD_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "")
-              BEHIND_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.behind_by' 2>/dev/null || echo "")
-              SUMMARY="repo=${REPO} base=${DEFAULT_BRANCH} vis=${VISIBILITY} branch=${BR} ahead_by=${AHEAD_BY:-0} behind_by=${BEHIND_BY:-0}"
-              log INFO "$SUMMARY"
-            done
-          fi
+        #   if [ -z "$IMPROVEMENT_BRANCHES" ]; then
+        #     log WARN "No branches matched pattern"
+        #   else
+        #     ((REPOS_WITH_IMPROVEMENTS++))
+        #     log INFO "Sort branches descending (YYYY-MM prefix sorts well in dictionary order)"
+        #     printf "%s\n" "$IMPROVEMENT_BRANCHES" | sort -r | while read -r BR; do
+        #       [ -z "$BR" ] && continue
+        #       AHEAD_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "")
+        #       BEHIND_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.behind_by' 2>/dev/null || echo "")
+        #       SUMMARY="repo=${REPO} base=${DEFAULT_BRANCH} vis=${VISIBILITY} branch=${BR} ahead_by=${AHEAD_BY:-0} behind_by=${BEHIND_BY:-0}"
+        #       log INFO "$SUMMARY"
+        #     done
+        #   fi
 
-          LAST_MERGED=$(gh pr list -R "${ORG_NAME}/${REPO}" --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
-          log INFO "repo ${REPO} last_merged_into_base=${LAST_MERGED:-none}"
-          echo "::endgroup::"
-        done < "$RUNNER_TEMP/repos.txt"
+        #   LAST_MERGED=$(gh pr list -R "${ORG_NAME}/${REPO}" --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
+        #   log INFO "repo ${REPO} last_merged_into_base=${LAST_MERGED:-none}"
+        #   echo "::endgroup::"
+        # done < "$RUNNER_TEMP/repos.txt"
 
-        echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
+        # echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
         echo "status=success" >> "$GITHUB_OUTPUT"
         log INFO "Processing complete: ${REPOS_PROCESSED} repos processed, ${REPOS_WITH_IMPROVEMENTS} with improvements"
 
