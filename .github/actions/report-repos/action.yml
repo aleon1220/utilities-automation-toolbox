@@ -163,15 +163,15 @@ runs:
         log INFO "Starting processing of repositories"
 
         while IFS= read -r REPO; do
-          log DEBUG "Checking raw field splitting for REPO"
           [ -z "$REPO" ] && continue
           ((REPOS_PROCESSED++))
-          log DEBUG "Processing repository #${REPOS_PROCESSED}: ${REPO}"
+          log INFO "Processing repository #${REPOS_PROCESSED}: ${REPO}"
 
           echo "::group::Report for ${ORG_NAME}/${REPO}"
 
+          log DEBUG "Fetching repository metadata for ${REPO}"
           DEFAULT_BRANCH=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.default_branch' 2>/dev/null || echo "")
-          log INFO "obtained default branch for ${REPO}: ${DEFAULT_BRANCH}"
+          log INFO "Obtained default branch for ${REPO}: ${DEFAULT_BRANCH}"
           
           if [ -z "$DEFAULT_BRANCH" ]; then
             log ERROR "Failed to fetch default branch or access repository ${REPO}. Skipping."
@@ -180,47 +180,54 @@ runs:
           fi
 
           VISIBILITY=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.visibility' 2>/dev/null || echo "")
+          log DEBUG "Repository ${REPO} visibility: ${VISIBILITY}"
 
           if [ "$DEFAULT_BRANCH" != "main" ]; then
-            log WARN "for ${REPO} git Default branch is ${DEFAULT_BRANCH} TODO: review base branch convention"
+            log WARN "Repository ${REPO} uses non-standard default branch: ${DEFAULT_BRANCH}"
           fi
 
+          log DEBUG "Fetching branches for ${REPO}"
           ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
-          log INFO "Fetched all branches for ${REPO} "
-          count=$(echo "$ALL_BRANCHES" | wc -l)
-          log INFO "Total branches in ${REPO}: ${count}"
+          BRANCH_COUNT=$(printf "%s\n" "$ALL_BRANCHES" | sed '/^\s*$/d' | wc -l | tr -d ' ')
+          log INFO "Fetched ${BRANCH_COUNT} branches for ${REPO}"
           
           if [ -n "${BRANCH_PATTERN:-}" ]; then
-            # Use -- to avoid option parsing when pattern starts with '-'
             IMPROVEMENT_BRANCHES=$(printf "%s\n" "$ALL_BRANCHES" | grep -E -- "${BRANCH_PATTERN}" || true)
           else
             IMPROVEMENT_BRANCHES=""
           fi
-          log INFO "Found all improvement-like branches (pattern='${BRANCH_PATTERN}')"
 
           if [ -z "$IMPROVEMENT_BRANCHES" ]; then
-            log WARN "No branches matched pattern"
+            log INFO "No improvement branches found matching pattern: ${BRANCH_PATTERN}"
           else
+            log INFO "Found improvement branches matching pattern: ${BRANCH_PATTERN}"
             ((REPOS_WITH_IMPROVEMENTS++))
-            log INFO "Sort branches descending (YYYY-MM prefix sorts well in dictionary order)"
-            printf "%s\n" "$IMPROVEMENT_BRANCHES" | sort -r | while read -r BR; do
+            
+            log DEBUG "Processing improvement branches in descending order"
+            while read -r BR; do
               [ -z "$BR" ] && continue
-              AHEAD_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "")
-              BEHIND_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.behind_by' 2>/dev/null || echo "")
-              SUMMARY="repo=${REPO} base=${DEFAULT_BRANCH} vis=${VISIBILITY} branch=${BR} ahead_by=${AHEAD_BY:-0} behind_by=${BEHIND_BY:-0}"
-              log INFO "$SUMMARY"
-            done
+              log DEBUG "Analyzing branch: ${BR}"
+              AHEAD_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "0")
+              BEHIND_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.behind_by' 2>/dev/null || echo "0")
+              log INFO "Branch comparison: repo=${REPO} base=${DEFAULT_BRANCH} vis=${VISIBILITY} branch=${BR} ahead_by=${AHEAD_BY} behind_by=${BEHIND_BY}"
+            done < <(printf "%s\n" "$IMPROVEMENT_BRANCHES" | sort -r)
           fi
 
+          log DEBUG "Fetching last merged PR for ${REPO}"
           LAST_MERGED=$(gh pr list -R "${ORG_NAME}/${REPO}" --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
-          log INFO "repo ${REPO} last_merged_into_base=${LAST_MERGED:-none}"
+          if [ -z "$LAST_MERGED" ]; then
+            log INFO "No merged PRs found for ${REPO} into ${DEFAULT_BRANCH}"
+          else
+            log INFO "Last merged PR for ${REPO}: ${LAST_MERGED}"
+          fi
+          
           echo "::endgroup::"
         done < "$RUNNER_TEMP/repos.txt"
 
+        log INFO "Repository processing complete: ${REPOS_PROCESSED} repos processed, ${REPOS_WITH_IMPROVEMENTS} with improvements"
         echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
         echo "status=success" >> "$GITHUB_OUTPUT"
-        log INFO "Processing complete: ${REPOS_PROCESSED} repos processed, ${REPOS_WITH_IMPROVEMENTS} with improvements"
-        log INFO "finished processing git repositories"
+        log INFO "Step execution finished successfully"
 
 
     - name: Summary (has repos)
