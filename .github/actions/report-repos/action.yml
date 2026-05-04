@@ -209,7 +209,6 @@ runs:
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
           [ -z "$REPO" ] && continue
           REPOS_CHECKED=$((REPOS_CHECKED + 1))
-          log DEBUG "Fixed Safe arithmetic addition"
           log DEBUG "Phase 2: Fetching branches for ${REPO}"
 
           ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
@@ -225,8 +224,10 @@ runs:
           if [ -z "$IMPROVEMENT_BRANCHES" ]; then
             log DEBUG "Phase 2: No improvement branches found in ${REPO} for pattern: ${BRANCH_PATTERN}"
           else
-            ((REPOS_WITH_IMPROVEMENTS++))
+            REPOS_WITH_IMPROVEMENTS=$((REPOS_WITH_IMPROVEMENTS + 1))
             log INFO "Phase 2: Repository ${REPO} has improvement branches"
+            log DEBUG "Fixed Safe arithmetic addition"
+
             while read -r BR; do
               [ -z "$BR" ] && continue
               echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}" >> "$BRANCHES_FILE"
@@ -234,8 +235,8 @@ runs:
           fi
         done < "$RUNNER_TEMP/repos_metadata.txt"
 
-        log INFO "Phase 2 completed: ${REPOS_CHECKED} repos checked, ${REPOS_WITH_IMPROVEMENTS} with improvements"
         echo "repos_with_improvements=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
+        log INFO "Phase 2 completed: ${REPOS_CHECKED} repos checked, ${REPOS_WITH_IMPROVEMENTS} with improvements"
 
     - name: Process repos - Phase 3 - Analyze branch comparisons
       id: phase3_comparisons
@@ -254,7 +255,7 @@ runs:
 
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR; do
           [ -z "$REPO" ] && continue
-          ((BRANCHES_ANALYZED++))
+          BRANCHES_ANALYZED=$((BRANCHES_ANALYZED + 1))
           
           log DEBUG "Phase 3: Analyzing branch ${BR} in ${REPO}"
           AHEAD_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "0")
@@ -264,8 +265,8 @@ runs:
           echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${AHEAD_BY}|${BEHIND_BY}" >> "$COMPARISON_FILE"
         done < "$RUNNER_TEMP/improvement_branches.txt"
 
-        log INFO "Phase 3 completed: ${BRANCHES_ANALYZED} branches analyzed"
         echo "branches_analyzed=${BRANCHES_ANALYZED}" >> "$GITHUB_OUTPUT"
+        log INFO "Phase 3 completed: total ${BRANCHES_ANALYZED} github branches analyzed"
 
     - name: Process repos - Phase 4 - Collect merge history
       id: phase4_merges
@@ -284,7 +285,7 @@ runs:
 
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
           [ -z "$REPO" ] && continue
-          ((REPOS_MERGED_CHECKED++))
+          REPOS_MERGED_CHECKED=$((REPOS_MERGED_CHECKED + 1))
 
           log DEBUG "Phase 4: Fetching merge history for ${REPO}"
           LAST_MERGED=$(gh pr list -R "${ORG_NAME}/${REPO}" --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
@@ -298,11 +299,11 @@ runs:
 
           echo "${REPO}|${LAST_MERGED}" >> "$MERGE_FILE"
         done < "$RUNNER_TEMP/repos_metadata.txt"
-
-        log INFO "Phase 4 completed: ${REPOS_MERGED_CHECKED} repositories checked for merge history"
+        
         echo "repos_checked=${REPOS_MERGED_CHECKED}" >> "$GITHUB_OUTPUT"
+        log INFO "Phase 4 completed: ${REPOS_MERGED_CHECKED} repositories checked for merge history"
 
-    - name: Process repos - Phase 5 - Aggregate results and generate reports
+    - name: Process repos - Phase 5 - Aggregate results generate reports
       id: process
       if: steps.enumerate.outputs.status == 'has_repos'
       shell: bash
@@ -336,7 +337,7 @@ runs:
         log INFO "Phase 5 completed: Results aggregation finished"
         log INFO "Processing workflow completed successfully"
 
-    - name: Summary (has repos)
+    - name: Summary with Github repos
       if: steps.enumerate.outputs.status == 'has_repos'
       shell: bash
       run: |
@@ -350,7 +351,7 @@ runs:
           echo "- Repos with improvement branches: ${IMP}"
         } >> "$GITHUB_STEP_SUMMARY"
 
-    - name: Summary (no repos)
+    - name: Summary No repos
       if: steps.enumerate.outputs.status == 'no_repos'
       shell: bash
       run: |
@@ -369,4 +370,4 @@ runs:
       run: |
         echo "================= GitHub REST API docs: https://docs.github.com/en/rest"
         gh api --verbose "repos/${GITHUB_REPOSITORY}/branches" || echo "Verbose output unavailable"
-        echo "================= completed verbose API call for branch diagnostics"
+        echo "================= completed verbose API call for branch diagnostics repo ${GITHUB_REPOSITORY}"
