@@ -14,6 +14,7 @@ plugins {
     // id("com.github.johnrengelman.shadow") version "8.3.0"
     // https://plugins.gradle.org/plugin/com.gradleup.shadow
     alias(libs.plugins.shadow)
+    alias(libs.plugins.axion)
 }
 
 application {
@@ -56,4 +57,31 @@ tasks.withType<Jar> {
     // Enable reproducible archives for consistent DevOps artifact generation
     isReproducibleFileOrder = true
     // preserveFileTimestamps = false
+}
+
+// 2. Configure the Semantic Versioning behavior
+scmVersion {
+    println("Calculate app utility Version")
+
+    // Auto-detect commit types to determine the NEXT version
+    // - Commits with "feat:" = MINOR bump
+    // - Commits with "fix:" (or default) = PATCH bump
+    // - MAJOR bumps remain manual (via explicit tagging)
+
+    // versionIncrementer.set("conventionalCommits")
+    
+    // Automatically append -SNAPSHOT if the current commit doesn't have a tag
+    println("Calculated Git Version: ${scmVersion.version}")
+}
+
+// 3. Bind the calculated Git version to the Gradle project
+project.version = scmVersion.version
+
+// Optional: standard group configuration
+group = "org.aleon1220.utilities"
+
+tasks.register("printVersion") {
+    doLast {
+        println("Calculated Project Version: ${project.version}")
+    }
 }

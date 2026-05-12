@@ -72,13 +72,15 @@ simplified local build with the gradle wrapper to fix a specific gradle version
 
 ```bash
 EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+
 cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
-pushd $EXECUTION_SANDBOX
 ```
 
 * smoke test the execution
 
 ```bash
+pushd $EXECUTION_SANDBOX
+
 java -jar appJavaUtils-all.jar --this-week --dryrun
 ```
 
