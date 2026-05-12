@@ -34,7 +34,7 @@ jobs:
         uses: ./.github/actions/java-build-test
         with:
           java-version: '25'
-          working-directory: 'java-utilities'
+          working-directory: .
 
       - name: Upload Fat JAR Artifact
         uses: actions/upload-artifact@v7.0.1
