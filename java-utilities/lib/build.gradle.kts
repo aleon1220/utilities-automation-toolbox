@@ -75,7 +75,7 @@ scmVersion {
 }
 
 // 3. Bind the calculated Git version to the Gradle project
-project.version = scmVersion.version
+version = scmVersion.version
 
 // Optional: standard group configuration
 group = "org.aleon1220.utilities"
