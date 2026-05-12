@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 log() {
   local level="${1:-INFO}"; shift
   local msg="$*"
