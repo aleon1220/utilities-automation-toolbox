@@ -42,7 +42,7 @@ public class WorkLogConfig implements Runnable {
     @Option(names = { "-e", "--end" }, description = "End date")
     Optional<LocalDate> endDate = Optional.empty();
 
-    @Option(names = { "-t", "--this-week" }, description = "creates from the business day of this week to the end of this week")
+    @Option(names = { "-t", "--this-week" }, description = "creates WorkLogs for this work week")
     boolean thisWeek;
 
     @Option(names = { "-d", "--dryrun" }, description = "safely execute and mock the execution")
@@ -68,10 +68,9 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day"));
 
     static String textFridayTemplate = """
-            ## End of week Reflection | Learning & Next Goals
-
-            1. reflection
-            2. learning
+            %n## End of week Reflection | Learning & Next Goals%n
+            1. week_reflection
+            2. week_learning
             3. next_week_goal
 
             """;
@@ -153,16 +152,14 @@ public class WorkLogConfig implements Runnable {
     }
 
     // todo: this method is an attempt to append content. Simplify and generalise
-    public static void addContentToMarkdownFile(String overrideMarkdownFile) {
-        // var overrideMarkdownFile = "C:\\ws\\04\\2025-04-30-Wednesday.md";
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFile, true))) {
-            var xtraMarkdownContent = "extra markdown content to be added";
+    public static void addContentToMarkdownFile(String overrideMarkdownFilePath, String xtraMarkdownContent) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFilePath, true))) {
             var headerWorkLogDayFormatted = String.format("## %s appending %n", formatDateForFileName(LocalDate.now()));
             System.out.println("======= markdown content to add: " + headerWorkLogDayFormatted + xtraMarkdownContent);
             writer.write(headerWorkLogDayFormatted);
             writer.write(xtraMarkdownContent);
             writer.newLine();
-            System.out.println("======= markdown override added to file " + overrideMarkdownFile);
+            System.out.println("======= markdown override added to file " + overrideMarkdownFilePath);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -243,17 +240,17 @@ public class WorkLogConfig implements Runnable {
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new WorkLogConfig()).execute(args);
+        // todo: add logs that show the output directory and file names being
         System.exit(exitCode);
     }
 
-    // todo: add logs that show the output directory and file names being
-    // created for better visibility and debugging
     private Path resolveOutputDirectory() {
         String base = "/mnt/c/workspace/TESTS";
         String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
         Path dir = Path.of(base, today);
 
         if (dryrun) {
+            System.out.println("======= 🛠️ [DRY RUN] for better visibility and debugging OutputDirectory");
             System.out.println("======= 🛠️ [DRY RUN] Would ensure output directory exists: " + dir);
             return dir;
         }

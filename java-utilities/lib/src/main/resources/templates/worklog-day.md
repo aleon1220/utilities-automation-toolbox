@@ -27,8 +27,6 @@
 
 ## AFTERNOON
 
-### TODO_activity_name
-
 1. todo_important_note
 
 ## WRAP UP DAY
@@ -40,9 +38,9 @@
 
 ### Day Reflection & Learning
 
-1. todo_add_reflection
-2. todo_add_learning
+1. Day reflection todo_add_reflection
+2. Day learning todo_add_learning
 
 ### Timesheet submission
 
-- NZ_Timesheet_Code todo_add
+- NZ_Timesheet_Code todo_add_charging_code
