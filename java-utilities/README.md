@@ -2,9 +2,9 @@
 
 A collection of Java CLI utilities designed to automate repetitive tasks. This project is part of the `utilities-automation-toolbox` and provides a set of operations that can be run on-demand, weekly, or randomly to streamline developer workflows.
 
-Currently, the primary tool included is the **WorkLog markdown generator**, which automates the creation of daily work logs.
+Currently, the primary tool included is the **WorkLog markdown generator**, which automates the creation of daily work logs in markdown format.
 
-## WorkLog markdown
+## CLI utility WorkLog markdown
 
 WorkLog is a Picocli-based CLI automation tool that generates daily markdown worklog files between a start and end date.
 
@@ -48,9 +48,9 @@ The utility generates **one `.md` file per business day** within the given date 
 
 Before building or running the utilities, ensure you have the following installed:
 
-*   **Java JDK 25**: The project uses Java 25 toolchain features.
-*   **Gradle**: While the project includes a Gradle wrapper (`gradlew`), having Gradle installed locally can be helpful.
-*   **WSL (Optional)**: Highly recommended if you are developing on Windows 11, as the scripts and commands are optimized for a Linux-like environment (e.g., Ubuntu 24).
+* **Java JDK 25**: The project uses Java 25 toolchain features.
+* **Gradle**: While the project includes a Gradle wrapper (`gradlew`), having Gradle installed locally can be helpful.
+* **WSL (Optional)**: Highly recommended if you are developing on Windows 11, as the scripts and commands are optimized for a Linux-like environment (e.g., Ubuntu 24).
 
 ***
 
@@ -58,7 +58,7 @@ Before building or running the utilities, ensure you have the following installe
 
 ### Release Execution Fat Jar
 
-simplified local build with the gradle wrapper to fix a specific gradle version
+execute from main root directory. Simplified local build with the gradle wrapper to fix a specific gradle version
 
 * build Fat jar
 
@@ -66,23 +66,43 @@ simplified local build with the gradle wrapper to fix a specific gradle version
 ./gradlew clean build shadowJar
 ```
 
-* output location `ls -lha lib/build/libs/`
-* the java archie with all dependencies fat/uber JAR is `appJavaUtils-all.jar`
+* gradle plugin help
+  
+  ```bash
+  ./gradlew -q help --task shadowJar
+  ```
+
+* output location `ls -lha ./java-utilities/lib/build/libs/`
+* the java archive with all dependencies fat/uber JAR is versioned e.g. `lib-0.1.0-feature-java-utility-release-automation-SNAPSHOT-all.jar`
+* obtain the version
+
+  ```bash
+  UTIL_APP_VERSION=$(./gradlew getVersion --quiet)
+  UTIL_JAR_NAME="lib-$UTIL_APP_VERSION-all.jar"
+  ```
+
 * copy file to execution sandbox if using WSL from Windows11
 
-```bash
-EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+  ```bash
+  EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+  cp ./java-utilities/lib/build/libs/$UTIL_JAR_NAME $EXECUTION_SANDBOX
+  ```
 
-cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
-```
+* navigate to sandbox
+
+  ```bash
+  pushd $EXECUTION_SANDBOX
+  ```
 
 * smoke test the execution
 
-```bash
-pushd $EXECUTION_SANDBOX
+  ```bash
+  java -jar $UTIL_JAR_NAME --this-week --dryrun
+  ```
 
-java -jar appJavaUtils-all.jar --this-week --dryrun
-```
+* copy or move the file to your target directory
+
+todo: implement cli option to add a target directory either windows or linux
 
 ### 🧪 local Development Unit Test Build & Run
 
