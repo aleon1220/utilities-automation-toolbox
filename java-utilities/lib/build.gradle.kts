@@ -6,6 +6,9 @@
  * This project uses @Incubating APIs which are subject to change.
  */
 
+import pl.allegro.tech.build.axion.release.domain.hooks.HookContext
+import org.gradle.kotlin.dsl.KotlinClosure2 
+
 plugins {
     // Apply the java-library plugin for API and implementation separation.
     id("java-library")
@@ -65,8 +68,7 @@ scmVersion {
     // - Commits with "fix:" (or default) = PATCH bump
     // - MAJOR bumps remain manual (via explicit tagging)
 
-    // versionIncrementer.set("conventionalCommits")
-    
+    useHighestVersion.set(true)
     // Automatically append -SNAPSHOT if the current commit doesn't have a tag
     tag {
         prefix.set("v")
@@ -74,10 +76,18 @@ scmVersion {
 
     versionIncrementer("incrementPatch")
 
-    // hooks {
-    //     pre("fileUpdate", [file: "README.md", pattern: {v,p -> /(version.) $v/}, replacement: {v, p -> "\$1 $v"}])
-    //     pre("commit")
-    // }
+    hooks {
+        pre(
+            "fileUpdate",
+            mapOf(
+                "file" to "README.md",
+                // Kotlin DSL requires KotlinClosure2 to map to Groovy closures for Axion
+                "pattern" to KotlinClosure2({ v: String, _: HookContext -> "(version.) $v" }),
+                "replacement" to KotlinClosure2({ v: String, _: HookContext -> "\$1 $v" })
+            )
+        )
+        pre("commit")
+    }
 }
 
 // 3. Bind the calculated Git version to the Gradle project
