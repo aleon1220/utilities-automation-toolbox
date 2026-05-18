@@ -122,10 +122,6 @@ tasks.register("hybridRelease") {
   val currentVer = project.version.toString()
   val readmeFile = rootProject.file("java-utilities/README.md")
 
-  // Capture variables at configuration time to support Gradle Configuration Cache
-  val currentVer = project.version.toString()
-  val readmeFile = rootProject.file("java-utilities/README.md")
-
   doLast {
     // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT. 
     // The actual release version needs to increment the patch number.
