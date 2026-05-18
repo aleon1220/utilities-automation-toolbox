@@ -74,7 +74,7 @@ scmVersion {
     pre(
       "fileUpdate",
       mapOf(
-        "file" to "../README.md",
+        "file" to "java-utilities/README.md",
         // Kotlin DSL requires KotlinClosure2 to map to Groovy closures for Axion
         "pattern" to KotlinClosure2({ v: String, _: HookContext -> "(lib-)$v(-all\\.jar)" }),
         "replacement" to KotlinClosure2({ v: String, _: HookContext -> "\$1$v\$2" }),
