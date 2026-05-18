@@ -113,3 +113,36 @@ spotless {
     ktfmt().googleStyle() // Use ktfmt or ktlint
   }
 }
+
+tasks.register("hybridRelease") {
+    description = "Updates files for release and prints the Git commands to manually sign and push."
+    group = "release"
+    
+    doLast {
+        // Calculate release version by stripping SNAPSHOT
+        val currentVer = project.version.toString()
+        val releaseVer = currentVer.replace(Regex("-SNAPSHOT.*"), "")
+        
+        // File to update
+        val readmeFile = rootProject.file("java-utilities/README.md")
+        if (readmeFile.exists()) {
+            val content = readmeFile.readText()
+            // The axion plugin passes the 'previous' version to the pattern. We'll use regex to replace it dynamically.
+            // Matching: lib-<any-version>-all.jar
+            val newContent = content.replace(Regex("(lib-).*?(-all\\.jar)"), "\$1$releaseVer\$2")
+            readmeFile.writeText(newContent)
+            println("✅ Updated version to $releaseVer in ${readmeFile.absolutePath}")
+        } else {
+            println("⚠️ Could not find ${readmeFile.absolutePath}")
+        }
+        
+        println("\n🚀 === Hybrid Release Ready ===")
+        println("Files have been updated. Run the following commands to commit, sign, tag, and push:")
+        println("--------------------------------------------------")
+        println("git add java-utilities/README.md")
+        println("git commit -S --signoff -m \"release: bump version to $releaseVer\"")
+        println("git tag -s v$releaseVer -m \"Release v$releaseVer\"")
+        println("git push && git push --tags")
+        println("--------------------------------------------------")
+    }
+}
