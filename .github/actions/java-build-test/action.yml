@@ -8,7 +8,7 @@ inputs:
   working-directory:
     description: 'The root directory of the Java project'
     required: false
-    default: 'java-utilities'
+    default: .
 runs:
   using: 'composite'
   steps:

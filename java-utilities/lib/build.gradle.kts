@@ -6,82 +6,149 @@
  * This project uses @Incubating APIs which are subject to change.
  */
 
+import org.gradle.kotlin.dsl.KotlinClosure2
+import pl.allegro.tech.build.axion.release.domain.hooks.HookContext
+
 plugins {
-    // Apply the java-library plugin for API and implementation separation.
-    id("java-library")
-    java
-    application
-    // id("com.github.johnrengelman.shadow") version "8.3.0"
-    // https://plugins.gradle.org/plugin/com.gradleup.shadow
-    alias(libs.plugins.shadow)
-    alias(libs.plugins.axion)
+  // Apply the java-library plugin for API and implementation separation.
+  id("java-library")
+  java
+  application
+  // https://plugins.gradle.org/plugin/com.gradleup.shadow
+  alias(libs.plugins.shadow)
+  alias(libs.plugins.axion)
+  alias(libs.plugins.spotless)
 }
 
-application {
-    mainClass.set("org.utils.WorkLogConfig")
-}
+application { mainClass.set("org.utils.WorkLogConfig") }
 
 repositories {
-    // Use Maven Central for resolving dependencies.
-    mavenCentral()
+  // Use Maven Central for resolving dependencies.
+  mavenCentral()
 }
 
 dependencies {
-    // This dependency is exported to consumers, that is to say found on their compile classpath.
-    api(libs.commons.math3)
-    // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation(libs.guava)
-    implementation(libs.picocli.core)
-    annotationProcessor(libs.picocli.codegen)
+  // This dependency is exported to consumers, that is to say found on their compile classpath.
+  api(libs.commons.math3)
+  // This dependency is used internally, and not exposed to consumers on their own compile
+  // classpath.
+  implementation(libs.guava)
+  implementation(libs.picocli.core)
+  annotationProcessor(libs.picocli.codegen)
 }
 
-
 testing {
-    suites {
-        // Configure the built-in test suite
-        val test by getting(JvmTestSuite::class) {
-            // Use JUnit Jupiter test framework
-            useJUnitJupiter("5.12.1")
-        }
-    }
+  suites {
+    // Configure the built-in test suite
+    val test by
+      getting(JvmTestSuite::class) {
+        // Use JUnit Jupiter test framework
+        useJUnitJupiter("5.12.1")
+      }
+  }
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 tasks.withType<Jar> {
-    // Enable reproducible archives for consistent DevOps artifact generation
-    isReproducibleFileOrder = true
-    // preserveFileTimestamps = false
+  // Enable reproducible archives for consistent DevOps artifact generation
+  isReproducibleFileOrder = true
+  // preserveFileTimestamps = false
 }
 
-// 2. Configure the Semantic Versioning behavior
+// Configure the Semantic Versioning behavior
 scmVersion {
-    println("Calculate app utility Version")
+  // Auto-detect commit types to determine the NEXT version
+  // - Commits with "feat:" = MINOR bump
+  // - Commits with "fix:" (or default) = PATCH bump
+  // - MAJOR bumps remain manual (via explicit tagging)
 
-    // Auto-detect commit types to determine the NEXT version
-    // - Commits with "feat:" = MINOR bump
-    // - Commits with "fix:" (or default) = PATCH bump
-    // - MAJOR bumps remain manual (via explicit tagging)
+  useHighestVersion.set(true)
+  // Automatically append -SNAPSHOT if the current commit doesn't have a tag
+  tag { prefix.set("v") }
 
-    // versionIncrementer.set("conventionalCommits")
-    
-    // Automatically append -SNAPSHOT if the current commit doesn't have a tag
-    println("Calculated Git Version: ${scmVersion.version}")
+  versionIncrementer("incrementPatch")
+
+  hooks {
+    pre(
+      "fileUpdate",
+      mapOf(
+        "file" to "java-utilities/README.md",
+        // Kotlin DSL requires KotlinClosure2 to map to Groovy closures for Axion
+        "pattern" to KotlinClosure2({ v: String, _: HookContext -> "(lib-)$v(-all\\.jar)" }),
+        "replacement" to KotlinClosure2({ v: String, _: HookContext -> "\$1$v\$2" }),
+      ),
+    )
+    pre("commit")
+  }
 }
 
 // 3. Bind the calculated Git version to the Gradle project
-project.version = scmVersion.version
+version = scmVersion.version
 
 // Optional: standard group configuration
 group = "org.aleon1220.utilities"
 
 tasks.register("printVersion") {
-    doLast {
-        println("Calculated Project Version: ${project.version}")
+  doLast { println("Calculated Project Version: ${project.version}") }
+}
+
+tasks.register("getVersion") {
+  // Description helps document the task if you run ./gradlew tasks
+  description = "Prints the raw project version for script consumption"
+  group = "help"
+
+  val projectVersion = project.version.toString()
+  print(projectVersion)
+
+  // doLast {
+  //     // print() avoids trailing newlines
+  // }
+}
+
+spotless {
+  kotlinGradle {
+    target("*.gradle.kts") // Target all Kotlin DSL build scripts
+    ktfmt().googleStyle() // Use ktfmt or ktlint
+  }
+}
+
+tasks.register("hybridRelease") {
+  description = "Updates files for release and prints the Git commands to manually sign and push."
+  group = "release"
+
+  doLast {
+    // Calculate release version by stripping SNAPSHOT
+    val currentVer = project.version.toString()
+    val releaseVer = currentVer.replace(Regex("-SNAPSHOT.*"), "")
+
+    // File to update
+    val readmeFile = rootProject.file("java-utilities/README.md")
+    if (readmeFile.exists()) {
+      val content = readmeFile.readText()
+      // The axion plugin passes the 'previous' version to the pattern. We'll use regex to replace
+      // it dynamically.
+      // Matching: lib-<any-version>-all.jar
+      val newContent = content.replace(Regex("(lib-).*?(-all\\.jar)"), "\$1$releaseVer\$2")
+      readmeFile.writeText(newContent)
+      println("✅ Updated version to $releaseVer in ${readmeFile.absolutePath}")
+    } else {
+      println("⚠️ Could not find ${readmeFile.absolutePath}")
     }
+
+    println("\n🚀 ✨ === Hybrid Release Ready === ✨ 🚀")
+    println(
+      "📁 Files have been updated! 🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:"
+    )
+    println("--------------------------------------------------")
+    println("➕  git add java-utilities/README.md")
+    println(
+      "📝  git commit --gpg-sign --signoff --message \"release: bump version to $releaseVer\""
+    )
+    println("🏷️   git tag --sign v$releaseVer --message \"Release v$releaseVer\"")
+    println("☁️   git push && git push --tags")
+    println("--------------------------------------------------")
+    println("🎉  Happy Releasing! 🥳\n")
+  }
 }
