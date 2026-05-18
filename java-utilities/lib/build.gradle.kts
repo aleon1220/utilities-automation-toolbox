@@ -72,6 +72,8 @@ scmVersion {
         prefix.set("v")
     }
 
+    versionIncrementer("incrementPatch")
+
     // hooks {
     //     pre("fileUpdate", [file: "README.md", pattern: {v,p -> /(version.) $v/}, replacement: {v, p -> "\$1 $v"}])
     //     pre("commit")
@@ -96,9 +98,9 @@ tasks.register("getVersion") {
     group = "help"
 
     val projectVersion = project.version.toString()
+    print(projectVersion)
 
-    doLast {
-        // print() avoids trailing newlines
-        print(projectVersion)
-    }
+    // doLast {
+    //     // print() avoids trailing newlines
+    // }
 }
