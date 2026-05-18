@@ -122,9 +122,22 @@ tasks.register("hybridRelease") {
   val currentVer = project.version.toString()
   val readmeFile = rootProject.file("java-utilities/README.md")
 
+  // Capture variables at configuration time to support Gradle Configuration Cache
+  val currentVer = project.version.toString()
+  val readmeFile = rootProject.file("java-utilities/README.md")
+
   doLast {
-    // Calculate release version by stripping SNAPSHOT
-    val releaseVer = currentVer.replace(Regex("-SNAPSHOT.*"), "")
+    // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT. 
+    // The actual release version needs to increment the patch number.
+    var baseVer = currentVer.replace(Regex("-SNAPSHOT.*"), "")
+    var releaseVer = baseVer
+    if (currentVer.contains("-SNAPSHOT")) {
+      val parts = baseVer.split(".")
+      if (parts.size == 3) {
+        val patch = parts[2].toIntOrNull() ?: 0
+        releaseVer = "${parts[0]}.${parts[1]}.${patch + 1}"
+      }
+    }
 
     // File to update
     if (readmeFile.exists()) {
