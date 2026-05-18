@@ -6,88 +6,82 @@
  * This project uses @Incubating APIs which are subject to change.
  */
 
+import org.gradle.kotlin.dsl.KotlinClosure2
 import pl.allegro.tech.build.axion.release.domain.hooks.HookContext
-import org.gradle.kotlin.dsl.KotlinClosure2 
 
 plugins {
-    // Apply the java-library plugin for API and implementation separation.
-    id("java-library")
-    java
-    application
-    // https://plugins.gradle.org/plugin/com.gradleup.shadow
-    alias(libs.plugins.shadow)
-    alias(libs.plugins.axion)
+  // Apply the java-library plugin for API and implementation separation.
+  id("java-library")
+  java
+  application
+  // https://plugins.gradle.org/plugin/com.gradleup.shadow
+  alias(libs.plugins.shadow)
+  alias(libs.plugins.axion)
+  alias(libs.plugins.spotless)
 }
 
-application {
-    mainClass.set("org.utils.WorkLogConfig")
-}
+application { mainClass.set("org.utils.WorkLogConfig") }
 
 repositories {
-    // Use Maven Central for resolving dependencies.
-    mavenCentral()
+  // Use Maven Central for resolving dependencies.
+  mavenCentral()
 }
 
 dependencies {
-    // This dependency is exported to consumers, that is to say found on their compile classpath.
-    api(libs.commons.math3)
-    // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation(libs.guava)
-    implementation(libs.picocli.core)
-    annotationProcessor(libs.picocli.codegen)
+  // This dependency is exported to consumers, that is to say found on their compile classpath.
+  api(libs.commons.math3)
+  // This dependency is used internally, and not exposed to consumers on their own compile
+  // classpath.
+  implementation(libs.guava)
+  implementation(libs.picocli.core)
+  annotationProcessor(libs.picocli.codegen)
 }
 
-
 testing {
-    suites {
-        // Configure the built-in test suite
-        val test by getting(JvmTestSuite::class) {
-            // Use JUnit Jupiter test framework
-            useJUnitJupiter("5.12.1")
-        }
-    }
+  suites {
+    // Configure the built-in test suite
+    val test by
+      getting(JvmTestSuite::class) {
+        // Use JUnit Jupiter test framework
+        useJUnitJupiter("5.12.1")
+      }
+  }
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 tasks.withType<Jar> {
-    // Enable reproducible archives for consistent DevOps artifact generation
-    isReproducibleFileOrder = true
-    // preserveFileTimestamps = false
+  // Enable reproducible archives for consistent DevOps artifact generation
+  isReproducibleFileOrder = true
+  // preserveFileTimestamps = false
 }
 
 // Configure the Semantic Versioning behavior
 scmVersion {
-    // Auto-detect commit types to determine the NEXT version
-    // - Commits with "feat:" = MINOR bump
-    // - Commits with "fix:" (or default) = PATCH bump
-    // - MAJOR bumps remain manual (via explicit tagging)
+  // Auto-detect commit types to determine the NEXT version
+  // - Commits with "feat:" = MINOR bump
+  // - Commits with "fix:" (or default) = PATCH bump
+  // - MAJOR bumps remain manual (via explicit tagging)
 
-    useHighestVersion.set(true)
-    // Automatically append -SNAPSHOT if the current commit doesn't have a tag
-    tag {
-        prefix.set("v")
-    }
+  useHighestVersion.set(true)
+  // Automatically append -SNAPSHOT if the current commit doesn't have a tag
+  tag { prefix.set("v") }
 
-    versionIncrementer("incrementPatch")
+  versionIncrementer("incrementPatch")
 
-    hooks {
-        pre(
-            "fileUpdate",
-            mapOf(
-                "file" to "README.md",
-                // Kotlin DSL requires KotlinClosure2 to map to Groovy closures for Axion
-                "pattern" to KotlinClosure2({ v: String, _: HookContext -> "(version.) $v" }),
-                "replacement" to KotlinClosure2({ v: String, _: HookContext -> "\$1 $v" })
-            )
-        )
-        pre("commit")
-    }
+  hooks {
+    pre(
+      "fileUpdate",
+      mapOf(
+        "file" to "README.md",
+        // Kotlin DSL requires KotlinClosure2 to map to Groovy closures for Axion
+        "pattern" to KotlinClosure2({ v: String, _: HookContext -> "(version.) $v" }),
+        "replacement" to KotlinClosure2({ v: String, _: HookContext -> "\$1 $v" }),
+      ),
+    )
+    pre("commit")
+  }
 }
 
 // 3. Bind the calculated Git version to the Gradle project
@@ -97,20 +91,25 @@ version = scmVersion.version
 group = "org.aleon1220.utilities"
 
 tasks.register("printVersion") {
-    doLast {
-        println("Calculated Project Version: ${project.version}")
-    }
+  doLast { println("Calculated Project Version: ${project.version}") }
 }
 
 tasks.register("getVersion") {
-    // Description helps document the task if you run ./gradlew tasks
-    description = "Prints the raw project version for script consumption"
-    group = "help"
+  // Description helps document the task if you run ./gradlew tasks
+  description = "Prints the raw project version for script consumption"
+  group = "help"
 
-    val projectVersion = project.version.toString()
-    print(projectVersion)
+  val projectVersion = project.version.toString()
+  print(projectVersion)
 
-    // doLast {
-    //     // print() avoids trailing newlines
-    // }
+  // doLast {
+  //     // print() avoids trailing newlines
+  // }
+}
+
+spotless {
+  kotlinGradle {
+    target("*.gradle.kts") // Target all Kotlin DSL build scripts
+    ktfmt().googleStyle() // Use ktfmt or ktlint
+  }
 }
