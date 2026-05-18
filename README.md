@@ -13,3 +13,11 @@ where there is a native replacement e.g. `aws-cli` instead of python `boto3` it 
 - `java-utilities/`
 - `powershell-utilities/`
 - `python-utilities/`
+
+
+## release new version java-utilities
+
+1. Merge PR to main branch
+2. Run `./gradlew hybridRelease --no-configuration-cache` locally
+3. Copy the git commands and run them.
+4. GH Actions triggers and release happens automatically.
