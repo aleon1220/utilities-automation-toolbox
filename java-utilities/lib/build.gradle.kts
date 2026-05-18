@@ -58,7 +58,7 @@ tasks.withType<Jar> {
     // preserveFileTimestamps = false
 }
 
-// 2. Configure the Semantic Versioning behavior
+// Configure the Semantic Versioning behavior
 scmVersion {
     // Auto-detect commit types to determine the NEXT version
     // - Commits with "feat:" = MINOR bump
@@ -68,7 +68,14 @@ scmVersion {
     // versionIncrementer.set("conventionalCommits")
     
     // Automatically append -SNAPSHOT if the current commit doesn't have a tag
-    // println("Calculated scm Version: ${scmVersion.version}")
+    tag {
+        prefix.set("v")
+    }
+
+    // hooks {
+    //     pre("fileUpdate", [file: "README.md", pattern: {v,p -> /(version.) $v/}, replacement: {v, p -> "\$1 $v"}])
+    //     pre("commit")
+    // }
 }
 
 // 3. Bind the calculated Git version to the Gradle project
@@ -87,9 +94,11 @@ tasks.register("getVersion") {
     // Description helps document the task if you run ./gradlew tasks
     description = "Prints the raw project version for script consumption"
     group = "help"
-    
+
+    val projectVersion = project.version.toString()
+
     doLast {
         // print() avoids trailing newlines
-        print(project.version)
+        print(projectVersion)
     }
 }

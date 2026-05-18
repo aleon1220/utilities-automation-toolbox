@@ -21,4 +21,6 @@ picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "pico
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 jreleaser = { id = "org.jreleaser", version.ref = "jreleaser" }
 upcoming4j = { id = "io.github.sttamper.upcoming4j", version.ref = "upcoming4j" }
+
+# https://axion-release-plugin.readthedocs.io/en/latest/
 axion = { id = "pl.allegro.tech.build.axion-release", version.ref = "axion" }
