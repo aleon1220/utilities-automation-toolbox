@@ -2,17 +2,17 @@ name: Java Utilities CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-      - 'java-utilities/**'
-      - '.github/workflows/ci-cd-java-utilities.yml'
-      - '.github/actions/java-build-test/**'
+      - "java-utilities/**"
+      - ".github/workflows/ci-cd-java-utilities.yml"
+      - ".github/actions/java-build-test/**"
     tags:
-      - 'v*.*.*' # semVer tags trigger release job v1.0.0
+      - "v*.*.*" # semVer tags trigger release job v1.0.0
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-      - 'java-utilities/**'
+      - "java-utilities/**"
   workflow_dispatch:
 
 permissions:
@@ -33,15 +33,15 @@ jobs:
       - name: Build Java Utilities
         uses: ./.github/actions/java-build-test
         with:
-          java-version: '25'
+          java-version: "25"
           working-directory: .
 
       - name: Upload Fat JAR Artifact
         uses: actions/upload-artifact@v7.0.1
         # https://github.com/marketplace/actions/upload-a-build-artifact
         with:
-          name: appJavaUtils-all.jar
-          path: java-utilities/lib/build/libs/appJavaUtils-all.jar
+          name: java-utilities-fat-jar
+          path: java-utilities/lib/build/libs/lib-*-all.jar
           if-no-files-found: error
 
   release:
@@ -50,19 +50,29 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Crucial for creating a GitHub Release    
+      contents: write # Crucial for creating a GitHub Release
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6.0.2
 
+      - name: Print TODO for JGit Signing
+        run: |
+          echo "====================================================================================="
+          echo "🚨 HUGE TODO: CREATE A GITHUB ISSUE IN THE PLUGIN PROVIDER (axion-release-plugin) 🚨"
+          echo "TO PROPERLY HANDLE GPG SIGNING WITH JGIT OR DELEGATE TO EXTERNAL GPG."
+          echo ""
+          echo "Assumption: The release is done manually and the git tag is signed from the local"
+          echo "laptop once a pull request is merged to main."
+          echo "====================================================================================="
+
       - name: Verify Version Calculation
-        run: ./gradlew printVersion  
+        run: ./gradlew currentVersion
 
       - name: Download Fat JAR Artifact
         uses: actions/download-artifact@v8.0.1
         # https://github.com/marketplace/actions/download-a-build-artifact
         with:
-          name: appJavaUtils-all.jar
+          name: java-utilities-fat-jar
           path: .
 
       - name: Create Release and Upload Asset
@@ -70,4 +80,4 @@ jobs:
         # https://github.com/marketplace/actions/gh-release
         with:
           generate_release_notes: true
-          files: appJavaUtils-all.jar
+          files: lib-*-all.jar
