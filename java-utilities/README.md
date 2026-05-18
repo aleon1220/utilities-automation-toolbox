@@ -73,12 +73,12 @@ execute from main root directory. Simplified local build with the gradle wrapper
   ```
 
 * output location `ls -lha ./java-utilities/lib/build/libs/`
-* the java archive with all dependencies fat/uber JAR is versioned e.g. `lib-0.1.1-feature-java-utility-release-automation-all.jar`
+* the java archive with all dependencies fat/uber JAR is versioned e.g. `lib-0.1.0-all.jar`
 * obtain the version
 
   ```bash
   UTIL_APP_VERSION=$(./gradlew getVersion --quiet)
-  UTIL_JAR_NAME="lib-0.1.1-feature-java-utility-release-automation-all.jar"
+  UTIL_JAR_NAME="lib-0.1.0-all.jar"
   ```
 
 * copy file to execution sandbox if using WSL from Windows11
