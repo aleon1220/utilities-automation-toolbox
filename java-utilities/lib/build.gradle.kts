@@ -118,13 +118,15 @@ tasks.register("hybridRelease") {
   description = "Updates files for release and prints the Git commands to manually sign and push."
   group = "release"
 
+  // Capture variables at configuration time to support Gradle Configuration Cache
+  val currentVer = project.version.toString()
+  val readmeFile = rootProject.file("java-utilities/README.md")
+
   doLast {
     // Calculate release version by stripping SNAPSHOT
-    val currentVer = project.version.toString()
     val releaseVer = currentVer.replace(Regex("-SNAPSHOT.*"), "")
 
     // File to update
-    val readmeFile = rootProject.file("java-utilities/README.md")
     if (readmeFile.exists()) {
       val content = readmeFile.readText()
       // The axion plugin passes the 'previous' version to the pattern. We'll use regex to replace
