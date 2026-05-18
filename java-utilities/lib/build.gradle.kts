@@ -123,7 +123,7 @@ tasks.register("hybridRelease") {
   val readmeFile = rootProject.file("java-utilities/README.md")
 
   doLast {
-    // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT. 
+    // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT.
     // The actual release version needs to increment the patch number.
     var baseVer = currentVer.replace(Regex("-SNAPSHOT.*"), "")
     var releaseVer = baseVer
