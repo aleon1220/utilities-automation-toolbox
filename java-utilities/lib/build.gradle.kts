@@ -136,13 +136,14 @@ tasks.register("hybridRelease") {
             println("⚠️ Could not find ${readmeFile.absolutePath}")
         }
         
-        println("\n🚀 === Hybrid Release Ready ===")
-        println("Files have been updated. Run the following commands to commit, sign, tag, and push:")
+        println("\n🚀 ✨ === Hybrid Release Ready === ✨ 🚀")
+        println("📁 Files have been updated! 🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:")
         println("--------------------------------------------------")
-        println("git add java-utilities/README.md")
-        println("git commit -S --signoff -m \"release: bump version to $releaseVer\"")
-        println("git tag -s v$releaseVer -m \"Release v$releaseVer\"")
-        println("git push && git push --tags")
+        println("➕  git add java-utilities/README.md")
+        println("📝  git commit --gpg-sign --signoff --message \"release: bump version to $releaseVer\"")
+        println("🏷️   git tag --sign v$releaseVer --message \"Release v$releaseVer\"")
+        println("☁️   git push && git push --tags")
         println("--------------------------------------------------")
+        println("🎉  Happy Releasing! 🥳\n")
     }
 }
