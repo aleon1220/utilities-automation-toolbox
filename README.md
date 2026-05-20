@@ -1,5 +1,10 @@
 # Utilities & Automation Toolbox
 
+🚀 **Java Utilities**
+
+[![Release](https://img.shields.io/github/v/release/gh-aleon1220/utilities-automation-toolbox?display_name=tag&sort=semver&label=📦%20Latest%20Release&color=blue)](https://github.com/gh-aleon1220/utilities-automation-toolbox/releases/latest)
+[![CI/CD Status](https://github.com/gh-aleon1220/utilities-automation-toolbox/actions/workflows/ci-cd-java-utilities.yml/badge.svg?branch=main)](https://github.com/gh-aleon1220/utilities-automation-toolbox/actions/workflows/ci-cd-java-utilities.yml)
+
 A collection of Bash, Java, PowerShell, Python utilities, GitHub Actions. This repo operates as the orchestrator repo for other git repos.
 
 helpful if you add a WSL layer with Linux distro.

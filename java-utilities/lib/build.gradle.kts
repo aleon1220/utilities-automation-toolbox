@@ -104,7 +104,6 @@ tasks.register("hybridRelease") {
   doLast {
     // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT
     // The actual release version needs to increment the patch number.
-    // new version should be added to the README.md file for the release by github actions as a badge
 
     println("\n🚀 ✨ === Hybrid Release Ready === ✨ 🚀")
     println(
