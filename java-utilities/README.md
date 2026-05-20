@@ -56,29 +56,36 @@ Before building or running the utilities, ensure you have the following installe
 
 ## 🚀 Executing the Java utilities
 
-### Release Execution Fat Jar
+### Local Release Execution Fat Jar
 
-execute from main root directory. Simplified local build with the gradle wrapper to fix a specific gradle version
+execute from main branch and root gradle project directory. Simplified local build with the gradle wrapper to fix a specific gradle version
+
+* check current version
+ 
+ ```bash
+ git tag
+ ./gradlew currentVersion
+ ```
 
 * build Fat jar
 
-```bash
-./gradlew clean build shadowJar
-```
+ ```bash
+ ./gradlew clean build shadowJar
+ ```
 
 * gradle plugin help
   
-  ```bash
-  ./gradlew -q help --task shadowJar
-  ```
+ ```bash
+ ./gradlew -q help --task shadowJar
+ ```
 
 * output location `ls -lha ./java-utilities/lib/build/libs/`
 * the java archive with all dependencies fat/uber JAR is versioned e.g. `lib-0.1.1-all.jar`
-* obtain the version
+* obtain the current version
 
   ```bash
   UTIL_APP_VERSION=$(./gradlew getVersion --quiet)
-  UTIL_JAR_NAME="lib-0.1.1-all.jar"
+  UTIL_JAR_NAME="lib-$UTIL_APP_VERSION-all.jar"
   ```
 
 * copy file to execution sandbox if using WSL from Windows11
@@ -100,7 +107,7 @@ execute from main root directory. Simplified local build with the gradle wrapper
   java -jar $UTIL_JAR_NAME --this-week --dryrun
   ```
 
-* copy or move the file to your target directory
+* copy or move the file to your target workspace directory
 
 todo: implement cli option to add a target directory either windows or linux
 
@@ -109,43 +116,41 @@ todo: implement cli option to add a target directory either windows or linux
 perform the steps locally for development purposes. I used WSL ubuntu 24 running from an enterprise windows11.
 
 * navigate to gradle project directory
+* run a clean Build
+ ```bash
+ gradle clean build 2>&1
+ ```
 
-```bash
-pushd ./java-utilities
-```
+* List Build Output
 
-### **Clean Build**
+ ```bash
+ ls -lh lib/build
+ ```
 
-```bash
-gradle clean build 2>&1
-```
+* Smoke test by running Help Command
 
-### **List Build Output**
+ ```bash
+ ./gradlew run --args="--help"
+ ```
 
-```bash
-ls -lh lib/build
-```
+* set start and end date
 
-### **Run Help Command**
+ ```bash
+ START_DATE="2026-03-10"
+ END_DATE="2026-03-21"
+ ```
 
-```bash
-gradle run --args="--help"
-```
-
-#### set start and end date
-
-```bash
-START_DATE="2026-03-10"
-END_DATE="2026-03-21"
-```
-
-#### **Run With Dry Run (Mock Execution)**
+* Run With Dry Run (Mock Execution)
 
 calculates starting the first business day of the week.
 
-```bash
-gradle run --args="--start $START_DATE --end $END_DATE --dryrun"
-```
+ ```bash
+ ./gradlew run --args="--start $START_DATE --end $END_DATE --dryrun"
+ ```
+
+* Run with flags long format and short format
+
+./gradlew run --args="-s 2026-05-20 --end=2026-05-23"
 
 ***
 
@@ -155,7 +160,7 @@ The project includes a CI pipeline to ensure code quality and functionality. The
 
 ### Testing Suite
 
-The testing suite focuses on verifying the core logic of the utilities without side effects (using dry runs).
+The testing suite focuses on verifying the core logic of the utilities without side effects (using dry runs)
 
 #### Smoke Test Execution
 

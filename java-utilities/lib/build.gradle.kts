@@ -6,9 +6,6 @@
  * This project uses @Incubating APIs which are subject to change.
  */
 
-import org.gradle.kotlin.dsl.KotlinClosure2
-import pl.allegro.tech.build.axion.release.domain.hooks.HookContext
-
 plugins {
   // Apply the java-library plugin for API and implementation separation.
   id("java-library")
@@ -67,21 +64,7 @@ scmVersion {
   useHighestVersion.set(true)
   // Automatically append -SNAPSHOT if the current commit doesn't have a tag
   tag { prefix.set("v") }
-
   versionIncrementer("incrementPatch")
-
-  hooks {
-    pre(
-      "fileUpdate",
-      mapOf(
-        "file" to "java-utilities/README.md",
-        // Kotlin DSL requires KotlinClosure2 to map to Groovy closures for Axion
-        "pattern" to KotlinClosure2({ v: String, _: HookContext -> "(lib-)$v(-all\\.jar)" }),
-        "replacement" to KotlinClosure2({ v: String, _: HookContext -> "\$1$v\$2" }),
-      ),
-    )
-    pre("commit")
-  }
 }
 
 // 3. Bind the calculated Git version to the Gradle project
@@ -101,10 +84,6 @@ tasks.register("getVersion") {
 
   val projectVersion = project.version.toString()
   print(projectVersion)
-
-  // doLast {
-  //     // print() avoids trailing newlines
-  // }
 }
 
 spotless {
@@ -120,44 +99,20 @@ tasks.register("hybridRelease") {
 
   // Capture variables at configuration time to support Gradle Configuration Cache
   val currentVer = project.version.toString()
-  val readmeFile = rootProject.file("java-utilities/README.md")
 
   doLast {
-    // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT.
+    // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT
     // The actual release version needs to increment the patch number.
-    var baseVer = currentVer.replace(Regex("-SNAPSHOT.*"), "")
-    var releaseVer = baseVer
-    if (currentVer.contains("-SNAPSHOT")) {
-      val parts = baseVer.split(".")
-      if (parts.size == 3) {
-        val patch = parts[2].toIntOrNull() ?: 0
-        releaseVer = "${parts[0]}.${parts[1]}.${patch + 1}"
-      }
-    }
-
-    // File to update
-    if (readmeFile.exists()) {
-      val content = readmeFile.readText()
-      // The axion plugin passes the 'previous' version to the pattern. We'll use regex to replace
-      // it dynamically.
-      // Matching: lib-<any-version>-all.jar
-      val newContent = content.replace(Regex("(lib-).*?(-all\\.jar)"), "\$1$releaseVer\$2")
-      readmeFile.writeText(newContent)
-      println("✅ Updated version to $releaseVer in ${readmeFile.absolutePath}")
-    } else {
-      println("⚠️ Could not find ${readmeFile.absolutePath}")
-    }
 
     println("\n🚀 ✨ === Hybrid Release Ready === ✨ 🚀")
-    println(
-      "📁 Files have been updated! 🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:"
-    )
+    println("🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:")
     println("--------------------------------------------------")
-    println("➕  git add java-utilities/README.md")
+    println("➕ if modified README temporarily git add java-utilities/README.md")
     println(
-      "📝  git commit --gpg-sign --signoff --message \"release: bump version to $releaseVer\""
+      "📝  git commit --gpg-sign --signoff --message \"release: bump version to $currentVer\""
     )
-    println("🏷️   git tag --sign v$releaseVer --message \"Release v$releaseVer\"")
+    println("📝  i should run the command locally from the linux instance")
+    println("🏷️   git tag --sign v$currentVer --message \"Release v$currentVer\"")
     println("☁️   git push && git push --tags")
     println("--------------------------------------------------")
     println("🎉  Happy Releasing! 🥳\n")

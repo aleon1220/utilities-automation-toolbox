@@ -5,8 +5,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.DayOfWeek;
@@ -62,17 +60,18 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, APRIL, 6), "Holy Week - Easter Monday"),
             entry(LocalDate.of(2026, APRIL, 25), "ANZAC official Day"),
             entry(LocalDate.of(2026, APRIL, 27), "ANZAC Monday Holiday"),
-            entry(LocalDate.of(2026, JUNE, 1), "Queen's Birthday"),
+            entry(LocalDate.of(2026, JUNE, 1), "UK Royalty Birthday"),
             entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
             entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
-            entry(LocalDate.of(2026, DECEMBER, 26), "Boxing Day"));
+            entry(LocalDate.of(2026, DECEMBER, 26), "Christmas Boxing Day"));
 
     static String textFridayTemplate = """
-            %n## End of week Reflection | Learning & Next Goals%n
+            
+            ## End of week Reflection | Learning & Next Goals
+            
             1. week_reflection
             2. week_learning
             3. next_week_goal
-
             """;
 
     static String loadResource(String resourcePath) {

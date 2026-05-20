@@ -22,6 +22,9 @@ jobs:
   build:
     name: Build and Test
     runs-on: ubuntu-latest
+    outputs:
+      app-utils-version: ${{ steps.build.outputs.app-utils-version }}
+      app-utils-fat-jar: ${{ steps.build.outputs.app-utils-fat-jar }}
     steps:
       - name: Checkout github Repository
         uses: actions/checkout@v6.0.2
@@ -31,6 +34,7 @@ jobs:
         #   fetch-depth: 0
 
       - name: Build Java Utilities
+        id: build
         uses: ./.github/actions/java-build-test
         with:
           java-version: "25"
@@ -41,7 +45,7 @@ jobs:
         # https://github.com/marketplace/actions/upload-a-build-artifact
         with:
           name: java-utilities-fat-jar
-          path: java-utilities/lib/build/libs/lib-*-all.jar
+          path: java-utilities/lib/build/libs/${{ steps.build.outputs.app-utils-fat-jar }}
           if-no-files-found: error
 
   release:
@@ -55,29 +59,35 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v6.0.2
 
-      - name: Print TODO for JGit Signing
+      - name: Release signing note
         run: |
           echo "====================================================================================="
-          echo "🚨 HUGE TODO: CREATE A GITHUB ISSUE IN THE PLUGIN PROVIDER (axion-release-plugin) 🚨"
-          echo "TO PROPERLY HANDLE GPG SIGNING WITH JGIT OR DELEGATE TO EXTERNAL GPG."
-          echo ""
-          echo "Assumption: The release is done manually and the git tag is signed from the local"
-          echo "laptop once a pull request is merged to main."
+          echo "🔐 Release signing is assumed to be handled by the annotated tag or external process."
+          echo "If you need GPG-signed tags, create and push the signed tag locally before workflow execution."
           echo "====================================================================================="
 
       - name: Verify Version Calculation
-        run: ./gradlew currentVersion
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          EXPECTED_TAG="v${{ needs.build.outputs.app-utils-version }}"
+          echo "Tag name: $TAG_NAME"
+          echo "Expected tag: $EXPECTED_TAG"
+          if [ "$TAG_NAME" != "$EXPECTED_TAG" ]; then
+            echo "Tag mismatch: release tag does not match calculated version" >&2
+            exit 1
+          fi
 
       - name: Download Fat JAR Artifact
         uses: actions/download-artifact@v8.0.1
         # https://github.com/marketplace/actions/download-a-build-artifact
         with:
           name: java-utilities-fat-jar
-          path: .
+          path: ./artifact
 
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v3.0.0
         # https://github.com/marketplace/actions/gh-release
         with:
           generate_release_notes: true
-          files: lib-*-all.jar
+          tag_name: ${{ github.ref_name }}
+          files: artifact/java-utilities/lib/build/libs/${{ needs.build.outputs.app-utils-fat-jar }}
