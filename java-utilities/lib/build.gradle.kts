@@ -108,11 +108,11 @@ tasks.register("hybridRelease") {
     println("🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:")
     println("--------------------------------------------------")
     println("➕ if modified README temporarily git add java-utilities/README.md")
+    println("📝 git flow ")
     println(
-      "📝  git commit --gpg-sign --signoff --message \"release: bump version to $currentVer\""
+      "git add . ; git commit --gpg-sign --signoff --message \"release: bump version to $currentVer\" "
     )
-    println("📝  i should run the command locally from the linux instance")
-    println("🏷️   git tag --sign v$currentVer --message \"Release v$currentVer\"")
+    println("🏷️   git tag --sign v$currentVer --message \"Release v$currentVer\"  ")
     println("☁️   git push && git push --tags")
     println("--------------------------------------------------")
     println("🎉  Happy Releasing! 🥳\n")
