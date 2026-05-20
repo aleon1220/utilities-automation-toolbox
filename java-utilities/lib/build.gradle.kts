@@ -84,7 +84,6 @@ tasks.register("getVersion") {
 
   val projectVersion = project.version.toString()
   print(projectVersion)
-
 }
 
 spotless {
@@ -106,12 +105,12 @@ tasks.register("hybridRelease") {
     // The actual release version needs to increment the patch number.
 
     println("\n🚀 ✨ === Hybrid Release Ready === ✨ 🚀")
-    println(
-      "🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:"
-    )
+    println("🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:")
     println("--------------------------------------------------")
     println("➕ if modified README temporarily git add java-utilities/README.md")
-    println("📝  git commit --gpg-sign --signoff --message \"release: bump version to $currentVer\"" )
+    println(
+      "📝  git commit --gpg-sign --signoff --message \"release: bump version to $currentVer\""
+    )
     println("📝  i should run the command locally from the linux instance")
     println("🏷️   git tag --sign v$currentVer --message \"Release v$currentVer\"")
     println("☁️   git push && git push --tags")
