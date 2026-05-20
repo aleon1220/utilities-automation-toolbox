@@ -29,9 +29,9 @@ jobs:
       - name: Checkout github Repository
         uses: actions/checkout@v6.0.2
         # https://github.com/marketplace/actions/checkout
-        # with:
-        #   # CRITICAL: Axion needs the full git history to calculate versions
-        #   fetch-depth: 0
+        with:
+          # CRITICAL: Axion needs the full git history to calculate versions
+          fetch-depth: 0
 
       - name: Build Java Utilities
         id: build
@@ -90,4 +90,4 @@ jobs:
         with:
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
-          files: artifact/java-utilities/lib/build/libs/${{ needs.build.outputs.app-utils-fat-jar }}
+          files: artifact/${{ needs.build.outputs.app-utils-fat-jar }}
