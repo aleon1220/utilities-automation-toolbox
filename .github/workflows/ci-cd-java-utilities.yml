@@ -66,13 +66,15 @@ jobs:
           echo "====================================================================================="
 
       - name: Verify Version Calculation
-        run: ./gradlew currentVersion
+        run: |
+          echo "====================================================================================="
+          echo "🚨 TODO:  🚨"
 
       - name: Download Fat JAR Artifact
         uses: actions/download-artifact@v8.0.1
         # https://github.com/marketplace/actions/download-a-build-artifact
         with:
-          name: java-utilities-fat-jar
+          name: java-utilities-fat-jar # todo: use name from upload step output
           path: .
 
       - name: Create Release and Upload Asset

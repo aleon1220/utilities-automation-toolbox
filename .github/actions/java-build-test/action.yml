@@ -9,6 +9,14 @@ inputs:
     description: 'The root directory of the Java project'
     required: false
     default: .
+outputs:
+  app-utils-version:
+    description: 'version being created'
+    value: ${{ steps.build.outputs.app-utils-version }}
+  app-utils-fat-jar:
+    description: 'Path to the generated Fat JAR artifact'
+    value: ${{ steps.build.outputs.app-utils-fat-jar }}
+
 runs:
   using: 'composite'
   steps:
