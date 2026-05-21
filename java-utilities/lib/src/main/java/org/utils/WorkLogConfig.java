@@ -11,6 +11,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.Map;
 
 import static java.time.Month.JANUARY;
@@ -54,8 +55,7 @@ public class WorkLogConfig implements Runnable {
     String baseOutputDir;
 
     // todo: add holidays to separate class
-    static LocalDate endOfMonth = LocalDate.now()
-            .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
+    // LocalDate endOfMonth = startDate.with(TemporalAdjusters.lastDayOfMonth());
 
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
@@ -71,9 +71,9 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, DECEMBER, 26), "Christmas Boxing Day"));
 
     static String textFridayTemplate = """
-            
+
             ## End of week Reflection | Learning & Next Goals
-            
+
             1. week_reflection
             2. week_learning
             3. next_week_goal
@@ -94,65 +94,68 @@ public class WorkLogConfig implements Runnable {
         return formatter.format(date);
     }
 
-    void createMarkdownFiles() {
-        if (startDate.isEmpty() || endDate.isEmpty()) {
-            System.out.println("======= Start and end dates are required");
-            return;
-        }
+    void createMarkdownFiles(LocalDate startDate) {
+        // dynamic creation
+        LocalDate endOfMonth = startDate.with(TemporalAdjusters.lastDayOfMonth());
 
-        if (!isValidDateRange(startDate.get(), endDate.get())) {
-            System.out.println("======= Invalid date range");
-            return;
-        }
-
-        try {
-            if (dryrun) {
-                System.out.println("======= DRY RUN MODE ENABLED =======");
+        for (LocalDate current = startDate; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
+            
+            if (isWeekend(current) || isNZHoliday(current)) {
+                 continue; // Skips weekends and holidays cleanly
             }
-            Path outputDir = resolveOutputDirectory();
-            for (LocalDate date = startDate.get(); !date.isAfter(endDate.get()); date = date.plusDays(1)) {
 
-                if (isWeekend(date)) {
-                    System.out.println("======= Skipping Weekend for " + formatDateForFileName(date));
-                    continue;
-                }
+            if (!isValidDateRange(startDate, endDate.get())) {
+                System.out.println("======= Invalid date range");
+                return;
+            }
 
-                if (isNZHoliday(date)) {
-                    System.out.println("======= Skipping Holiday " + HOLIDAYS_2026.get(date));
-                    continue;
-                }
-
-                var standardizedDateName = formatDateForFileName(date);
-                String fileName = standardizedDateName + ".md";
-                Path filePath = outputDir.resolve(fileName);
-
+            try {
                 if (dryrun) {
-                    System.out.printf("======= 🛠️ [DRY RUN] Would create file %s at path %s %n", fileName, filePath);
+                    System.out.println("======= DRY RUN MODE ENABLED =======");
+                }
+                Path outputDir = resolveOutputDirectory();
+                for (LocalDate date = startDate ; !date.isAfter(endDate.get()); date = date.plusDays(1)) {
+
+                    if (isWeekend(date)) {
+                        System.out.println("======= Skipping Weekend for " + formatDateForFileName(date));
+                        continue;
+                    }
+
+                    if (isNZHoliday(date)) {
+                        System.out.println("======= Skipping Holiday " + HOLIDAYS_2026.get(date));
+                        continue;
+                    }
+
+                    var standardizedDateName = formatDateForFileName(date);
+                    String fileName = standardizedDateName + ".md";
+                    Path filePath = outputDir.resolve(fileName);
+
+                    if (dryrun) {
+                        System.out.printf("======= 🛠️ [DRY RUN] Would create file %s at path %s %n", fileName, filePath);
+                        if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                            System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n", fileName);
+                        }
+                        continue;
+                    }
+
+                    var template = loadResource("templates/worklog-day.md");
+                    var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
+                    
+                    Files.writeString(filePath, fullMarkdownContent);
+                    System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
+
                     if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                        System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n", fileName);
-                    }
-                    continue;
-                }
-
-                var template = loadResource("templates/worklog-day.md");
-                var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
-                
-                Files.writeString(filePath, fullMarkdownContent);
-                Files.writeString(filePath, fullMarkdownContent);
-                System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
-
-                if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                    try (BufferedWriter writer = Files.newBufferedWriter(filePath,
-                            java.nio.file.StandardOpenOption.APPEND)) {
-                        writer.write(textFridayTemplate);
-                        System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
+                        try (BufferedWriter writer = Files.newBufferedWriter(filePath,
+                                java.nio.file.StandardOpenOption.APPEND)) {
+                            writer.write(textFridayTemplate);
+                            System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
+                        }
                     }
                 }
+            } catch (IOException e) {
+                System.err.println("Error creating markdown files: " + e.getMessage());
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            System.err.println("Error creating markdown files: " + e.getMessage());
-            e.printStackTrace();
-        }
     }
 
     // todo: this method is an attempt to append content. Simplify and generalise
@@ -235,7 +238,7 @@ public class WorkLogConfig implements Runnable {
         }
 
         if (startDate.isPresent() && endDate.isPresent()) {
-            createMarkdownFiles();
+            createMarkdownFiles(startDate.get());
         } else {
             System.out.println("======= Start and end dates are required or use --this-week");
             new CommandLine(this).usage(System.out);
