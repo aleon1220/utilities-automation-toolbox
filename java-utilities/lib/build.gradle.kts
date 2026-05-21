@@ -64,9 +64,7 @@ tasks.jacocoTestCoverageVerification {
   violationRules {
     rule {
       includes = listOf("org.utils.WorkLogConfig*")
-      limit {
-        minimum = "0.80".toBigDecimal()
-      }
+      limit { minimum = "0.80".toBigDecimal() }
     }
   }
 }
