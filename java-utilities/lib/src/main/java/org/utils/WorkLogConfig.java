@@ -55,7 +55,6 @@ public class WorkLogConfig implements Runnable {
     String baseOutputDir;
 
     // todo: add holidays to separate class
-    // LocalDate endOfMonth = startDate.with(TemporalAdjusters.lastDayOfMonth());
 
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
@@ -94,14 +93,14 @@ public class WorkLogConfig implements Runnable {
         return formatter.format(date);
     }
 
-    void createMarkdownFiles(LocalDate startDate) {
-        // dynamic creation
+    public void createMarkdownFiles(LocalDate startDate) {
+        // dynamic calculate the end of the month based on the passed-in date
         LocalDate endOfMonth = startDate.with(TemporalAdjusters.lastDayOfMonth());
 
         for (LocalDate current = startDate; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
-            
+
             if (isWeekend(current) || isNZHoliday(current)) {
-                 continue; // Skips weekends and holidays cleanly
+                continue; // Skips weekends and holidays cleanly
             }
 
             if (!isValidDateRange(startDate, endDate.get())) {
@@ -114,7 +113,7 @@ public class WorkLogConfig implements Runnable {
                     System.out.println("======= DRY RUN MODE ENABLED =======");
                 }
                 Path outputDir = resolveOutputDirectory();
-                for (LocalDate date = startDate ; !date.isAfter(endDate.get()); date = date.plusDays(1)) {
+                for (LocalDate date = startDate; !date.isAfter(endDate.get()); date = date.plusDays(1)) {
 
                     if (isWeekend(date)) {
                         System.out.println("======= Skipping Weekend for " + formatDateForFileName(date));
@@ -131,16 +130,18 @@ public class WorkLogConfig implements Runnable {
                     Path filePath = outputDir.resolve(fileName);
 
                     if (dryrun) {
-                        System.out.printf("======= 🛠️ [DRY RUN] Would create file %s at path %s %n", fileName, filePath);
+                        System.out.printf("======= 🛠️ [DRY RUN] Would create file %s at path %s %n", fileName,
+                                filePath);
                         if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                            System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n", fileName);
+                            System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n",
+                                    fileName);
                         }
                         continue;
                     }
 
                     var template = loadResource("templates/worklog-day.md");
                     var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
-                    
+
                     Files.writeString(filePath, fullMarkdownContent);
                     System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
 
@@ -155,8 +156,9 @@ public class WorkLogConfig implements Runnable {
             } catch (IOException e) {
                 System.err.println("Error creating markdown files: " + e.getMessage());
                 e.printStackTrace();
-            }
-    }
+            } // end of catch block
+        } // end of for loop iterating over dates
+    } // end of createMarkdownFiles()
 
     // todo: this method is an attempt to append content. Simplify and generalise
     public static void addContentToMarkdownFile(String overrideMarkdownFilePath, String xtraMarkdownContent) {
@@ -267,5 +269,5 @@ public class WorkLogConfig implements Runnable {
             throw new IllegalStateException("Unable to create output directory: " + dir, e);
         }
         return dir;
-    }
+    } // end of resolveOutputDirectory()
 } // end of Class
