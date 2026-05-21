@@ -15,6 +15,7 @@ plugins {
   alias(libs.plugins.shadow)
   alias(libs.plugins.axion)
   alias(libs.plugins.spotless)
+  jacoco
 }
 
 application { mainClass.set("org.utils.WorkLogConfig") }
@@ -32,6 +33,7 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.picocli.core)
   annotationProcessor(libs.picocli.codegen)
+  testImplementation(libs.assertj.core)
 }
 
 testing {
@@ -42,6 +44,30 @@ testing {
         // Use JUnit Jupiter test framework
         useJUnitJupiter("5.12.1")
       }
+  }
+}
+
+tasks.test {
+  finalizedBy(tasks.jacocoTestReport) // report is always generated after tests run
+}
+
+tasks.jacocoTestReport {
+  dependsOn(tasks.test)
+  reports {
+    xml.required.set(true)
+    html.required.set(true)
+  }
+  finalizedBy(tasks.jacocoTestCoverageVerification)
+}
+
+tasks.jacocoTestCoverageVerification {
+  violationRules {
+    rule {
+      includes = listOf("org.utils.WorkLogConfig*")
+      limit {
+        minimum = "0.80".toBigDecimal()
+      }
+    }
   }
 }
 
