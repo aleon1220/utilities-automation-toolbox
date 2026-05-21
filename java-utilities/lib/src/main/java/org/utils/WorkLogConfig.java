@@ -93,6 +93,14 @@ public class WorkLogConfig implements Runnable {
         return formatter.format(date);
     }
 
+    public void createMarkdownFiles() {
+        if (startDate.isEmpty() || endDate.isEmpty()) {
+            System.out.println("======= Start and end dates are required");
+            return;
+        }
+        createMarkdownFiles(startDate.get());
+    }
+
     public void createMarkdownFiles(LocalDate startDate) {
         // dynamic calculate the end of the month based on the passed-in date
         LocalDate endOfMonth = startDate.with(TemporalAdjusters.lastDayOfMonth());

@@ -166,6 +166,10 @@ The testing suite focuses on verifying the core logic of the utilities without s
 #### run the test suite
 
 ```bash
+./gradlew test jacocoTestReport jacocoTestCoverageVerification
+
+#### run the test suite only for java-utilities sub-project
+```bash
 ./gradlew :java-utilities:lib:test :java-utilities:lib:jacocoTestReport :java-utilities:lib:jacocoTestCoverageVerification
 ```
 
