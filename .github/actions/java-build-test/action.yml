@@ -31,17 +31,29 @@ runs:
       uses: gradle/actions/setup-gradle@v6
       # https://github.com/gradle/actions/blob/main/README.md
 
-    - name: Build and Test with Gradle
+    - name: Test Suite with Gradle
       id: build
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
         gradle wrapper
         chmod +x gradlew
-        echo "checking location $PWD"
+        echo "================= Executing Test Suite =================="
+        ./gradlew test
+
+    - name: Build the Fat JAR Test with Gradle
+      id: build
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        gradle wrapper
+        chmod +x gradlew
+        echo "================= checking location $PWD =================="
         ls -lha
+        echo "================= Building the project and creating the Fat JAR =================="
         ./gradlew clean build shadowJar
         UTIL_APP_VERSION=$(./gradlew -q getVersion)
         UTIL_JAR_NAME="lib-$UTIL_APP_VERSION-all.jar"
         echo "app-utils-version=$UTIL_APP_VERSION" >> $GITHUB_OUTPUT
         echo "app-utils-fat-jar=$UTIL_JAR_NAME" >> $GITHUB_OUTPUT
+        echo "================= completed Build the Fat JAR =================="

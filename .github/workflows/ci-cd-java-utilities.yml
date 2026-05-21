@@ -33,7 +33,7 @@ jobs:
           # CRITICAL: Axion needs the full git history to calculate versions
           fetch-depth: 0
 
-      - name: Build Java Utilities
+      - name: Test suite and Build Java Utilities
         id: build
         uses: ./.github/actions/java-build-test
         with:
