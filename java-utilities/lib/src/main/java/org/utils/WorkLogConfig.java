@@ -19,6 +19,7 @@ import static java.time.Month.APRIL;
 import static java.time.Month.JUNE;
 import static java.time.Month.OCTOBER;
 import static java.time.Month.DECEMBER;
+import static java.time.Month.JULY;
 import static java.util.Map.entry;
 import java.util.Optional;
 
@@ -49,6 +50,9 @@ public class WorkLogConfig implements Runnable {
     @Option(names = { "-h", "--help" }, usageHelp = true, description = "worklog Show this help message and exit")
     boolean help;
 
+    @Option(names = { "-o", "--out" }, description = "Base output directory", defaultValue = "/mnt/c/workspace/TESTS")
+    String baseOutputDir;
+
     // todo: add holidays to separate class
     static LocalDate endOfMonth = LocalDate.now()
             .withDayOfMonth(LocalDate.now().getMonth().length(LocalDate.now().isLeapYear()));
@@ -61,6 +65,7 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, APRIL, 25), "ANZAC official Day"),
             entry(LocalDate.of(2026, APRIL, 27), "ANZAC Monday Holiday"),
             entry(LocalDate.of(2026, JUNE, 1), "UK Royalty Birthday"),
+            entry(LocalDate.of(2026, JULY, 10), "Matariki"),
             entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
             entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
             entry(LocalDate.of(2026, DECEMBER, 26), "Christmas Boxing Day"));
@@ -244,9 +249,8 @@ public class WorkLogConfig implements Runnable {
     }
 
     private Path resolveOutputDirectory() {
-        String base = "/mnt/c/workspace/TESTS";
         String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
-        Path dir = Path.of(base, today);
+        Path dir = Path.of(baseOutputDir, today);
 
         if (dryrun) {
             System.out.println("======= 🛠️ [DRY RUN] for better visibility and debugging OutputDirectory");
