@@ -13,6 +13,7 @@
     "allDeclaredMethods" : true,
     "allPublicMethods" : true,
     "fields" : [
+      { "name" : "baseOutputDir" },
       { "name" : "dryrun" },
       { "name" : "endDate" },
       { "name" : "help" },

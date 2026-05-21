@@ -127,18 +127,14 @@ tasks.register("hybridRelease") {
   doLast {
     // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT
     // The actual release version needs to increment the patch number.
-
     println("\n🚀 ✨ === Hybrid Release Ready === ✨ 🚀")
     println("🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:")
+    println("➕ 📝 README last minute edits git add . ; git commit --gpg-sign --signoff ; git push ")
     println("--------------------------------------------------")
-    println("➕ if modified README temporarily git add java-utilities/README.md")
-    println("📝 git flow ")
-    println(
-      "git add . ; git commit --gpg-sign --signoff --message \"release: bump version to $currentVer\" "
-    )
-    println("🏷️   git tag --sign v$currentVer --message \"Release v$currentVer\"  ")
-    println("☁️   git push && git push --tags")
+    println("📝  --message release: bump version to $currentVer ")
+    println("🏷️  git tag --sign v$currentVer --message \"Release v$currentVer\"  ")
+    println("☁️  git push && git push --tags")
     println("--------------------------------------------------")
-    println("🎉  Happy Releasing! 🥳\n")
+    println("🎉  Happy Releasing! 🥳")
   }
 }
