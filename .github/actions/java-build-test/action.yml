@@ -32,7 +32,7 @@ runs:
       # https://github.com/gradle/actions/blob/main/README.md
 
     - name: Test Suite with Gradle
-      id: build
+      id: test
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
