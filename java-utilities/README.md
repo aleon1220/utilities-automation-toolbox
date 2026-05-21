@@ -109,7 +109,7 @@ execute from main branch and root gradle project directory. Simplified local bui
 
 * copy or move the file to your target workspace directory
 
-todo: implement cli option to add a target directory either windows or linux
+todo: implement a dynamic way to identify whether windows or linux
 
 ### 🧪 local Development Unit Test Build & Run
 
@@ -117,6 +117,7 @@ perform the steps locally for development purposes. I used WSL ubuntu 24 running
 
 * navigate to gradle project directory
 * run a clean Build
+
  ```bash
  gradle clean build 2>&1
  ```
@@ -161,6 +162,12 @@ The project includes a CI pipeline to ensure code quality and functionality. The
 ### Testing Suite
 
 The testing suite focuses on verifying the core logic of the utilities without side effects (using dry runs)
+
+#### run the test suite
+
+```bash
+./gradlew :java-utilities:lib:test :java-utilities:lib:jacocoTestReport :java-utilities:lib:jacocoTestCoverageVerification
+```
 
 #### Smoke Test Execution
 
