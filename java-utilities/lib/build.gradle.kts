@@ -7,6 +7,7 @@
  */
 
 plugins {
+<<<<<<< HEAD
     // Apply the java-library plugin for API and implementation separation.
     id("java-library")
     java
@@ -15,48 +16,138 @@ plugins {
     // https://plugins.gradle.org/plugin/com.gradleup.shadow
     alias(libs.plugins.shadow)
     alias(libs.plugins.axion)
+=======
+  // Apply the java-library plugin for API and implementation separation.
+  id("java-library")
+  java
+  application
+  // https://plugins.gradle.org/plugin/com.gradleup.shadow
+  alias(libs.plugins.shadow)
+  alias(libs.plugins.axion)
+  alias(libs.plugins.spotless)
+  jacoco
+>>>>>>> main
 }
 
-application {
-    mainClass.set("org.utils.WorkLogConfig")
-}
+application { mainClass.set("org.utils.WorkLogConfig") }
 
 repositories {
-    // Use Maven Central for resolving dependencies.
-    mavenCentral()
+  // Use Maven Central for resolving dependencies.
+  mavenCentral()
 }
 
 dependencies {
-    // This dependency is exported to consumers, that is to say found on their compile classpath.
-    api(libs.commons.math3)
-    // This dependency is used internally, and not exposed to consumers on their own compile classpath.
-    implementation(libs.guava)
-    implementation(libs.picocli.core)
-    annotationProcessor(libs.picocli.codegen)
+  // This dependency is exported to consumers, that is to say found on their compile classpath.
+  api(libs.commons.math3)
+  // This dependency is used internally, and not exposed to consumers on their own compile
+  // classpath.
+  implementation(libs.guava)
+  implementation(libs.picocli.core)
+  annotationProcessor(libs.picocli.codegen)
+  testImplementation(libs.assertj.core)
 }
 
-
 testing {
-    suites {
-        // Configure the built-in test suite
-        val test by getting(JvmTestSuite::class) {
-            // Use JUnit Jupiter test framework
-            useJUnitJupiter("5.12.1")
-        }
+  suites {
+    // Configure the built-in test suite
+    val test by
+      getting(JvmTestSuite::class) {
+        // Use JUnit Jupiter test framework
+        useJUnitJupiter("5.12.1")
+      }
+  }
+}
+
+tasks.test {
+  finalizedBy(tasks.jacocoTestReport) // report is always generated after tests run
+}
+
+tasks.jacocoTestReport {
+  dependsOn(tasks.test)
+  reports {
+    xml.required.set(true)
+    html.required.set(true)
+  }
+  finalizedBy(tasks.jacocoTestCoverageVerification)
+}
+
+tasks.jacocoTestCoverageVerification {
+  violationRules {
+    rule {
+      includes = listOf("org.utils.WorkLogConfig*")
+      limit { minimum = "0.80".toBigDecimal() }
     }
+  }
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 tasks.withType<Jar> {
-    // Enable reproducible archives for consistent DevOps artifact generation
-    isReproducibleFileOrder = true
-    // preserveFileTimestamps = false
+  // Enable reproducible archives for consistent DevOps artifact generation
+  isReproducibleFileOrder = true
+  // preserveFileTimestamps = false
+}
+
+// Configure the Semantic Versioning behavior
+scmVersion {
+  // Auto-detect commit types to determine the NEXT version
+  // - Commits with "feat:" = MINOR bump
+  // - Commits with "fix:" (or default) = PATCH bump
+  // - MAJOR bumps remain manual (via explicit tagging)
+
+  useHighestVersion.set(true)
+  // Automatically append -SNAPSHOT if the current commit doesn't have a tag
+  tag { prefix.set("v") }
+  versionIncrementer("incrementPatch")
+}
+
+// 3. Bind the calculated Git version to the Gradle project
+version = scmVersion.version
+
+// Optional: standard group configuration
+group = "org.aleon1220.utilities"
+
+tasks.register("printVersion") {
+  doLast { println("Calculated Project Version: ${project.version}") }
+}
+
+tasks.register("getVersion") {
+  // Description helps document the task if you run ./gradlew tasks
+  description = "Prints the raw project version for script consumption"
+  group = "help"
+
+  val projectVersion = project.version.toString()
+  print(projectVersion)
+}
+
+spotless {
+  kotlinGradle {
+    target("*.gradle.kts") // Target all Kotlin DSL build scripts
+    ktfmt().googleStyle() // Use ktfmt or ktlint
+  }
+}
+
+tasks.register("hybridRelease") {
+  description = "Updates files for release and prints the Git commands to manually sign and push."
+  group = "release"
+
+  // Capture variables at configuration time to support Gradle Configuration Cache
+  val currentVer = project.version.toString()
+
+  doLast {
+    // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT
+    // The actual release version needs to increment the patch number.
+    println("\n🚀 ✨ === Hybrid Release Ready === ✨ 🚀")
+    println("🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:")
+    println("➕ 📝 README last minute edits git add . ; git commit --gpg-sign --signoff ; git push ")
+    println("--------------------------------------------------")
+    println("📝  --message release: bump version to $currentVer ")
+    println("🏷️  git tag --sign v$currentVer --message \"Release v$currentVer\"  ")
+    println("☁️  git push && git push --tags")
+    println("--------------------------------------------------")
+    println("🎉  Happy Releasing! 🥳")
+  }
 }
 
 // 2. Configure the Semantic Versioning behavior

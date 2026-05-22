@@ -1,16 +1,18 @@
 # java-utilities
 
-A collection of Java CLI utilities designed to automate repetitive tasks. This project is part of the `utilities-automation-toolbox` and provides a set of operations that can be run on-demand, weekly, or randomly to streamline developer workflows.
+A collection of Java CLI utilities designed to automate repetitive tasks.
 
-Currently, the primary tool included is the **WorkLog markdown generator**, which automates the creation of daily work logs.
+This project is part of the `utilities-automation-toolbox` and provides a set of operations that can be run on-demand, weekly, or randomly to streamline developer workflows.
 
-## WorkLog markdown
+Currently, the primary tool included is the **WorkLog markdown generator**, which automates the creation of daily work logs in markdown format.
 
-WorkLog is a Picocli-based CLI automation tool that generates daily markdown worklog files between a start and end date.
+## CLI utility WorkLog markdown
+
+WorkLog Markdown is a Picocli-based CLI automation tool used to generate markdown worklog files on demand using New Zealand Holidays.
 
 uses the format **File Name Format yyyy-MM-dd-EEEE.md** Example: `2026-03-17-Tuesday.md`
 
-## 📘 WorkLogConfig – Core Responsibilities & Usage Guide
+## 📘 WorkLogConfig – Core & Usage Guide
 
 ## Core Responsibilities
 
@@ -20,17 +22,13 @@ The tool uses **Picocli** to accept command‑line arguments:
 
 | Option              | Description                                                                     |
 | ------------------- | ------------------------------------------------------------------------------- |
-| `--start`, `-s`     | Start date (YYYY-MM-DD format)                                                  |
-| `--end`, `-e`       | End date (YYYY-MM-DD format)                                                    |
-| `--this-week`, `-t` | Automatically creates logs from the start of this business week to the end      |
-| `--dryrun`, `-d`    | Safely execute and mock the execution without creating any files                |
-| `--help`, `-h`      | Displays the help message                                                       |
+| `--help`, `-h`      | Displays the help message  and some extra commands to facilitate execution      |
 
 ***
 
 ## **Markdown File Generation**
 
-The utility generates **one `.md` file per business day** within the given date range.
+The utility generates 1 **markdown `.md` file per business day** within the given date range.
 
 ### **Content Behavior**
 
@@ -46,86 +44,112 @@ The utility generates **one `.md` file per business day** within the given date 
 
 ## 📋 Prerequisites
 
-Before building or running the utilities, ensure you have the following installed:
+Before building or running the utilities, ensure you have the following installed
 
-*   **Java JDK 25**: The project uses Java 25 toolchain features.
-*   **Gradle**: While the project includes a Gradle wrapper (`gradlew`), having Gradle installed locally can be helpful.
-*   **WSL (Optional)**: Highly recommended if you are developing on Windows 11, as the scripts and commands are optimized for a Linux-like environment (e.g., Ubuntu 24).
+* **Java JDK 25**: The project uses Java 25 toolchain features.
+* **Gradle**: While the project includes a Gradle wrapper (`gradlew`), having Gradle installed locally can be helpful.
+* **WSL (Optional)**: Highly recommended if you are developing on Windows 11, as the scripts and commands are optimized for a Linux-like environment (e.g., Ubuntu 24).
 
 ***
 
 ## 🚀 Executing the Java utilities
 
-### Release Execution Fat Jar
+### Local Release Execution Fat Jar
 
-simplified local build with the gradle wrapper to fix a specific gradle version
+execute from main branch and root gradle project directory. Simplified local build with the gradle wrapper to fix a specific gradle version
+
+* check current version
+
+ ```bash
+ git tag
+ ./gradlew currentVersion
+ ```
 
 * build Fat jar
 
-```bash
-./gradlew clean build shadowJar
-```
+ ```bash
+ ./gradlew clean build shadowJar
+ ```
 
-* output location `ls -lha lib/build/libs/`
-* the java archie with all dependencies fat/uber JAR is `appJavaUtils-all.jar`
+* gradle plugin help
+  
+ ```bash
+ ./gradlew -q help --task shadowJar
+ ```
+
+* output location `ls -lha ./java-utilities/lib/build/libs/`
+* the java archive with all dependencies fat/uber JAR is versioned e.g. `lib-0.1.1-all.jar`
+* obtain the current version
+
+  ```bash
+  UTIL_APP_VERSION=$(./gradlew getVersion --quiet)
+  UTIL_JAR_NAME="lib-$UTIL_APP_VERSION-all.jar"
+  ```
+
 * copy file to execution sandbox if using WSL from Windows11
 
-```bash
-EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+  ```bash
+  EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+  cp ./java-utilities/lib/build/libs/$UTIL_JAR_NAME $EXECUTION_SANDBOX
+  ```
 
-cp lib/build/libs/appJavaUtils-all.jar $EXECUTION_SANDBOX
-```
+* navigate to sandbox
+
+  ```bash
+  pushd $EXECUTION_SANDBOX
+  ```
 
 * smoke test the execution
 
-```bash
-pushd $EXECUTION_SANDBOX
+  ```bash
+  java -jar $UTIL_JAR_NAME --this-week --dryrun
+  ```
 
-java -jar appJavaUtils-all.jar --this-week --dryrun
-```
+* copy or move the file to your target workspace directory
+
+todo: implement a dynamic way to identify whether windows or linux
 
 ### 🧪 local Development Unit Test Build & Run
 
 perform the steps locally for development purposes. I used WSL ubuntu 24 running from an enterprise windows11.
 
 * navigate to gradle project directory
+* run a clean Build
 
-```bash
-pushd ./java-utilities
-```
+ ```bash
+ gradle clean build 2>&1
+ ```
 
-### **Clean Build**
+* List Build Output
 
-```bash
-gradle clean build 2>&1
-```
+ ```bash
+ ls -lh lib/build
+ ```
 
-### **List Build Output**
+* Smoke test by running Help Command
 
-```bash
-ls -lh lib/build
-```
+ ```bash
+ ./gradlew run --args="--help"
+ ```
 
-### **Run Help Command**
+* set start and end date
 
-```bash
-gradle run --args="--help"
-```
+ ```bash
+ START_DATE="2026-03-10"
+ END_DATE="2026-03-21"
+ ```
 
-#### set start and end date
-
-```bash
-START_DATE="2026-03-10"
-END_DATE="2026-03-21"
-```
-
-#### **Run With Dry Run (Mock Execution)**
+* Run With Dry Run (Mock Execution)
 
 calculates starting the first business day of the week.
 
-```bash
-gradle run --args="--start $START_DATE --end $END_DATE --dryrun"
-```
+ ```bash
+ ./gradlew run --args="--start $START_DATE --end $END_DATE --dryrun"
+ ```
+
+* Run with flags long format and short format
+
+./gradlew run --args="-s 2026-05-20 --end=2026-05-23"
 
 ***
 
@@ -135,7 +159,18 @@ The project includes a CI pipeline to ensure code quality and functionality. The
 
 ### Testing Suite
 
-The testing suite focuses on verifying the core logic of the utilities without side effects (using dry runs).
+The testing suite focuses on verifying the core logic of the utilities without side effects (using dry runs)
+
+#### run the test suite
+
+```bash
+./gradlew test jacocoTestReport jacocoTestCoverageVerification
+
+#### run the test suite only for java-utilities sub-project
+
+```bash
+./gradlew :java-utilities:lib:test :java-utilities:lib:jacocoTestReport :java-utilities:lib:jacocoTestCoverageVerification
+```
 
 #### Smoke Test Execution
 

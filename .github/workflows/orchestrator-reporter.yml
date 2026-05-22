@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5.0.1
+        uses: actions/checkout@v6.0.2
 
       - name: Validate GitHub Token
         uses: ./.github/actions/validate-gh-token

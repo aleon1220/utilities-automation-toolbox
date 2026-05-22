@@ -2,8 +2,9 @@
 
 ## GOALS
 
-1. Personal Planning System [Trello](https://trello.com/c/63qYHZ9V)
+1. Personal Boards Planning System [Trello](https://trello.com/c/63qYHZ9V)
 2. Client planning system
+3. Work plans
 
 ## QUESTIONS
 
