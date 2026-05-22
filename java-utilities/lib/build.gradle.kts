@@ -7,16 +7,6 @@
  */
 
 plugins {
-<<<<<<< HEAD
-    // Apply the java-library plugin for API and implementation separation.
-    id("java-library")
-    java
-    application
-    // id("com.github.johnrengelman.shadow") version "8.3.0"
-    // https://plugins.gradle.org/plugin/com.gradleup.shadow
-    alias(libs.plugins.shadow)
-    alias(libs.plugins.axion)
-=======
   // Apply the java-library plugin for API and implementation separation.
   id("java-library")
   java
@@ -26,7 +16,6 @@ plugins {
   alias(libs.plugins.axion)
   alias(libs.plugins.spotless)
   jacoco
->>>>>>> main
 }
 
 application { mainClass.set("org.utils.WorkLogConfig") }
@@ -95,8 +84,7 @@ scmVersion {
   // - Commits with "feat:" = MINOR bump
   // - Commits with "fix:" (or default) = PATCH bump
   // - MAJOR bumps remain manual (via explicit tagging)
-
-  useHighestVersion.set(true)
+  // useHighestVersion.set(true)
   // Automatically append -SNAPSHOT if the current commit doesn't have a tag
   tag { prefix.set("v") }
   versionIncrementer("incrementPatch")
@@ -152,17 +140,17 @@ tasks.register("hybridRelease") {
 
 // 2. Configure the Semantic Versioning behavior
 scmVersion {
-    println("Calculate app utility Version")
+  println("Calculate app utility Version")
 
-    // Auto-detect commit types to determine the NEXT version
-    // - Commits with "feat:" = MINOR bump
-    // - Commits with "fix:" (or default) = PATCH bump
-    // - MAJOR bumps remain manual (via explicit tagging)
+  // Auto-detect commit types to determine the NEXT version
+  // - Commits with "feat:" = MINOR bump
+  // - Commits with "fix:" (or default) = PATCH bump
+  // - MAJOR bumps remain manual (via explicit tagging)
 
-    // versionIncrementer.set("conventionalCommits")
-    
-    // Automatically append -SNAPSHOT if the current commit doesn't have a tag
-    println("Calculated Git Version: ${scmVersion.version}")
+  // versionIncrementer.set("conventionalCommits")
+
+  // Automatically append -SNAPSHOT if the current commit doesn't have a tag
+  println("Calculated Git Version: ${scmVersion.version}")
 }
 
 // 3. Bind the calculated Git version to the Gradle project
@@ -170,9 +158,3 @@ project.version = scmVersion.version
 
 // Optional: standard group configuration
 group = "org.aleon1220.utilities"
-
-tasks.register("printVersion") {
-    doLast {
-        println("Calculated Project Version: ${project.version}")
-    }
-}
