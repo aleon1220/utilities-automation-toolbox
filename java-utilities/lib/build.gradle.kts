@@ -14,7 +14,6 @@ plugins {
   // https://plugins.gradle.org/plugin/com.gradleup.shadow
   alias(libs.plugins.shadow)
   alias(libs.plugins.axion)
-  alias(libs.plugins.spotless)
   jacoco
 }
 
@@ -109,13 +108,6 @@ tasks.register("getVersion") {
   print(projectVersion)
 }
 
-spotless {
-  kotlinGradle {
-    target("*.gradle.kts") // Target all Kotlin DSL build scripts
-    ktfmt().googleStyle() // Use ktfmt or ktlint
-  }
-}
-
 tasks.register("hybridRelease") {
   description = "Updates files for release and prints the Git commands to manually sign and push."
   group = "release"
@@ -141,14 +133,11 @@ tasks.register("hybridRelease") {
 // 2. Configure the Semantic Versioning behavior
 scmVersion {
   println("Calculate app utility Version")
-
   // Auto-detect commit types to determine the NEXT version
   // - Commits with "feat:" = MINOR bump
   // - Commits with "fix:" (or default) = PATCH bump
   // - MAJOR bumps remain manual (via explicit tagging)
-
   // versionIncrementer.set("conventionalCommits")
-
   // Automatically append -SNAPSHOT if the current commit doesn't have a tag
   println("Calculated Git Version: ${scmVersion.version}")
 }
