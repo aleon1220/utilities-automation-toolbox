@@ -70,9 +70,13 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, DECEMBER, 26), "Christmas Boxing Day"));
 
     static String textFridayTemplate = """
+<<<<<<< HEAD
+            %n## End of week Reflection | Learning & Next Goals%n
+=======
 
             ## End of week Reflection | Learning & Next Goals
 
+>>>>>>> main
             1. week_reflection
             2. week_learning
             3. next_week_goal

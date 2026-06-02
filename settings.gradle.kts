@@ -7,14 +7,15 @@
  */
 
 plugins {
-    // Apply the foojay-resolver plugin to allow automatic download of JDKs
-    // id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+  // Apply the foojay-resolver plugin to allow automatic download of JDKs
+  // id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 rootProject.name = "utilities-automation-toolbox"
 
 // Include the Java utilities (specifically the 'lib' sub-folder you have)
 include("java-utilities:lib")
+
 // project(":appJavaUtils").projectDir = file("lib")
 
 // Include your other polyglot folders
