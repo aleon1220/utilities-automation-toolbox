@@ -11,13 +11,9 @@ picocli = "4.7.5"
 axion = "1.21.1"
 spotless = "8.5.1"
 assertj = "3.25.3"
-
-[libraries]
-commons-math3 = { module = "org.apache.commons:commons-math3", version.ref = "commons-math3" }
-guava = { module = "com.google.guava:guava", version.ref = "guava" }
-picocli-core = { module = "info.picocli:picocli", version.ref = "picocli" }
-picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "picocli" }
-assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+catalogUpdateVersion_version = "1.1.0"
+pulumiJava = "1.28.0"
+versionUpdate_version = "0.54.0"
 
 [plugins]
 # https://gradleup.com/shadow/
@@ -30,3 +26,17 @@ axion = { id = "pl.allegro.tech.build.axion-release", version.ref = "axion" }
 
 # https://plugins.gradle.org/plugin/com.diffplug.spotless
 spotless = { id = "com.diffplug.spotless" , version.ref = "spotless" }
+
+
+# https://github.com/littlerobots/version-catalog-update-plugin
+catalogUpdate = { id = "nl.littlerobots.version-catalog-update", version.ref = "catalogUpdateVersion_version" }
+
+# https://github.com/ben-manes/gradle-versions-plugin
+versionUpdate = { id = "com.github.ben-manes.versions", version.ref = "versionUpdate_version" }
+
+[libraries]
+commons-math3 = { module = "org.apache.commons:commons-math3", version.ref = "commons-math3" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+picocli-core = { module = "info.picocli:picocli", version.ref = "picocli" }
+picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "picocli" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }

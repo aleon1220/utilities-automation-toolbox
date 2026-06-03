@@ -14,7 +14,6 @@ plugins {
   // https://plugins.gradle.org/plugin/com.gradleup.shadow
   alias(libs.plugins.shadow)
   alias(libs.plugins.axion)
-  alias(libs.plugins.spotless)
   jacoco
 }
 
@@ -105,22 +104,13 @@ tasks.register("getVersion") {
   // Description helps document the task if you run ./gradlew tasks
   description = "Prints the raw project version for script consumption"
   group = "help"
-
   val projectVersion = project.version.toString()
   print(projectVersion)
-}
-
-spotless {
-  kotlinGradle {
-    target("*.gradle.kts") // Target all Kotlin DSL build scripts
-    ktfmt().googleStyle() // Use ktfmt or ktlint
-  }
 }
 
 tasks.register("hybridRelease") {
   description = "Updates files for release and prints the Git commands to manually sign and push."
   group = "release"
-
   // Capture variables at configuration time to support Gradle Configuration Cache
   val currentVer = project.version.toString()
 
