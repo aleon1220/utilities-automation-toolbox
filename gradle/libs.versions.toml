@@ -13,13 +13,6 @@ spotless = "8.6.0"
 upcoming4j = "0.0.4"
 versionUpdate_version = "0.54.0"
 
-[libraries]
-assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
-commons-math3 = { module = "org.apache.commons:commons-math3", version.ref = "commons-math3" }
-guava = { module = "com.google.guava:guava", version.ref = "guava" }
-picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "picocli" }
-picocli-core = { module = "info.picocli:picocli", version.ref = "picocli" }
-
 [plugins]
 # https://axion-release-plugin.readthedocs.io/en/latest/
 axion = { id = "pl.allegro.tech.build.axion-release", version.ref = "axion" }
@@ -40,4 +33,3 @@ commons-math3 = { module = "org.apache.commons:commons-math3", version.ref = "co
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "picocli" }
 picocli-core = { module = "info.picocli:picocli", version.ref = "picocli" }
-versionUpdate = { id = "com.github.ben-manes.versions", version.ref = "versionUpdate_version" }
