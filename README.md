@@ -19,13 +19,13 @@ where there is a native replacement e.g. `aws-cli` instead of python `boto3` it 
 - `powershell-utilities/`
 - `python-utilities/`
 
-## release new version java-utilities
+### java-utilities release new version
 
 1. Merge PR to main branch
 2. check tasks `./gradlew tasks --all`
-3. Run `./gradlew hybridRelease --no-configuration-cache` locally
-4. Copy the git commands and run them to tag the release
-5. GH Actions triggers and release happens automatically
+3. From a linux machine or WSL with a GPG key create the new tag
+4. from Github validate tag
+5. GH Actions trigger the workflow CI/CD and release happens automatically
 
 ## Notes
 

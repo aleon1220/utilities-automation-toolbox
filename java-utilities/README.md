@@ -61,22 +61,22 @@ Before building or running the utilities, ensure you have the following installe
 execute from main branch and root gradle project directory. Simplified local build with the gradle wrapper to fix a specific gradle version
 
 * check current version
- 
+
  ```bash
  git tag
  ./gradlew currentVersion
- ```
-
-* build Fat jar
-
- ```bash
- ./gradlew clean build shadowJar
  ```
 
 * gradle plugin help
   
  ```bash
  ./gradlew -q help --task shadowJar
+ ```
+
+* build Fat jar
+
+ ```bash
+ ./gradlew clean build shadowJar
  ```
 
 * output location `ls -lha ./java-utilities/lib/build/libs/`
