@@ -95,16 +95,12 @@ version = scmVersion.version
 // Optional: standard group configuration
 group = "org.aleon1220.utilities"
 
-tasks.register("printVersion") {
-  doLast { println("Calculated Project Version: ${project.version}") }
-}
-
 tasks.register("getVersion") {
   // Description helps document the task if you run ./gradlew tasks
   description = "Prints the raw project version for script consumption"
   group = "help"
   val projectVersion = project.version.toString()
-  print(projectVersion)
+  doLast { print(projectVersion) }
 }
 
 tasks.register("hybridRelease") {

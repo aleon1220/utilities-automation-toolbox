@@ -41,8 +41,10 @@ runs:
         echo "================= built & prepared Gradle wrapper =================="
         ./gradlew spotlessApply
         echo "================= Linted Gradle Kotlin Files =================="
+        
         echo "================= Executing Test Suite =================="
         ./gradlew test
+        echo "================= Test Suite completed =================="
 
     - name: Build the Fat JAR Test with Gradle
       id: build
@@ -51,12 +53,19 @@ runs:
       run: |
         gradle wrapper
         chmod +x gradlew
+        echo "================= built & prepared Gradle wrapper =================="
+
         echo "================= checking location $PWD =================="
         ls -lha
+
         echo "================= Building the project and creating the Fat JAR =================="
         ./gradlew clean build shadowJar
+
         UTIL_APP_VERSION=$(./gradlew -q getVersion)
         UTIL_JAR_NAME="lib-$UTIL_APP_VERSION-all.jar"
-        echo "app-utils-version=$UTIL_APP_VERSION" >> $GITHUB_OUTPUT
-        echo "app-utils-fat-jar=$UTIL_JAR_NAME" >> $GITHUB_OUTPUT
+
+        echo "app-utils-version=$UTIL_APP_VERSION"
+        echo "app-utils-fat-jar=$UTIL_JAR_NAME"
+
+        # >> $GITHUB_OUTPUT
         echo "================= completed Build the Fat JAR =================="
