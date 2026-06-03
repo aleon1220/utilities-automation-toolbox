@@ -60,8 +60,6 @@ runs:
 
         echo "================= Building the project and creating the Fat JAR =================="
         ./gradlew clean build shadowJar
-
-
         echo "================= completed Build the Fat JAR =================="
 
     - name: extract version and jar name for outputs
