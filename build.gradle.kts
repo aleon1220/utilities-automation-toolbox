@@ -10,8 +10,8 @@ import nl.littlerobots.vcu.plugin.versionSelector
 
 plugins {
   alias(libs.plugins.catalogUpdate)
-  alias(libs.plugins.versionUpdate)
   alias(libs.plugins.spotless)
+  alias(libs.plugins.versionUpdate)
 }
 
 repositories {
@@ -27,12 +27,11 @@ spotless {
 }
 
 // LATEST to accept any latest version, STABLE to select only stable versions or
-// PREFER_STABLE (default setting) to accept unstable versions only if the catalog already uses an
-// unstable version
+// PREFER_STABLE (default setting) to accept unstable versions only if the catalog already uses an unstable version
 versionCatalogUpdate {
-  versionSelector {
-    // here 'it' is a ModuleVersionCandidate that can be used to determine if the version
-    // is allowed, returning true if it is.
-    !(it.candidate.version.contains("SNAPSHOT") || it.candidate.version.contains("ALPHA"))
-  }
+    versionSelector {
+        // here 'it' is a ModuleVersionCandidate that can be used to determine if the version
+        // is allowed, returning true if it is.
+        !(it.candidate.version.contains("SNAPSHOT") || it.candidate.version.contains("ALPHA"))
+    }
 }
