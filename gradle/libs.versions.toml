@@ -2,7 +2,7 @@
 # https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
 [versions]
 assertj = "4.0.0-M1"
-axion = "1.21.1"
+axion = "1.21.2"
 catalogUpdateVersion_version = "1.1.0"
 commons-math3 = "3.6.1"
 guava = "33.6.0-jre"
