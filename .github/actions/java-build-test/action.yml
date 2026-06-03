@@ -74,11 +74,12 @@ runs:
         chmod +x gradlew
         echo "================= built & prepared Gradle wrapper =================="
 
-        UTIL_APP_VERSION=$(./gradlew -q currentVersion)
+        UTIL_APP_VERSION=$(./gradlew -q :java-utilities:lib:getVersion)
         UTIL_JAR_NAME="lib-$UTIL_APP_VERSION-all.jar"
         
         # append to GITHUB_OUTPUT is the recommended way to set outputs in composite actions
         echo "app-utils-version=$UTIL_APP_VERSION" >> $GITHUB_OUTPUT
         echo "app-utils-fat-jar=$UTIL_JAR_NAME" >> $GITHUB_OUTPUT
         echo "================= extracted outputs =================="
+
     
