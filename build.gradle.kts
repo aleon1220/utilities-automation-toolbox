@@ -9,8 +9,8 @@
 import nl.littlerobots.vcu.plugin.versionSelector
 
 plugins {
-  alias(libs.plugins.spotless)
   alias(libs.plugins.catalogUpdate)
+  alias(libs.plugins.spotless)
   alias(libs.plugins.versionUpdate)
 }
 

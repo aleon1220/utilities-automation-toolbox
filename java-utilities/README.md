@@ -65,16 +65,16 @@ execute from main branch and root gradle project directory. Simplified local bui
  ./gradlew currentVersion
  ```
 
-* build Fat jar
-
- ```bash
- ./gradlew clean build shadowJar
- ```
-
 * gradle plugin help
   
  ```bash
  ./gradlew -q help --task shadowJar
+ ```
+
+* build Fat jar
+
+ ```bash
+ ./gradlew clean build shadowJar
  ```
 
 * output location `ls -lha ./java-utilities/lib/build/libs/`

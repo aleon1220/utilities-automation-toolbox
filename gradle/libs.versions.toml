@@ -8,8 +8,8 @@ commons-math3 = "3.6.1"
 guava = "33.6.0-jre"
 jreleaser = "1.24.0"
 picocli = "4.7.7"
-shadow = "9.4.1"
-spotless = "8.5.1"
+shadow = "9.4.2"
+spotless = "8.6.0"
 upcoming4j = "0.0.4"
 versionUpdate_version = "0.54.0"
 
@@ -31,4 +31,13 @@ shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 # https://plugins.gradle.org/plugin/com.diffplug.spotless
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 upcoming4j = { id = "io.github.sttamper.upcoming4j", version.ref = "upcoming4j" }
+# https://github.com/ben-manes/gradle-versions-plugin
+versionUpdate = { id = "com.github.ben-manes.versions", version.ref = "versionUpdate_version" }
+
+[libraries]
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+commons-math3 = { module = "org.apache.commons:commons-math3", version.ref = "commons-math3" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "picocli" }
+picocli-core = { module = "info.picocli:picocli", version.ref = "picocli" }
 versionUpdate = { id = "com.github.ben-manes.versions", version.ref = "versionUpdate_version" }

@@ -2,8 +2,15 @@
 
 ## GOALS
 
-1. Personal Planning System [Trello](https://trello.com/c/63qYHZ9V)
+1. Top 1:
+2. Secondary:
+3. Nice to have:
+
+### Systems to leverage
+
+1. Boards Planning System [Trello](https://trello.com/c/63qYHZ9V)
 2. Client planning system
+3. Work plans
 
 ## QUESTIONS
 

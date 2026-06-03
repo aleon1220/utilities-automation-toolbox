@@ -103,7 +103,6 @@ tasks.register("getVersion") {
   // Description helps document the task if you run ./gradlew tasks
   description = "Prints the raw project version for script consumption"
   group = "help"
-
   val projectVersion = project.version.toString()
   print(projectVersion)
 }
@@ -111,7 +110,6 @@ tasks.register("getVersion") {
 tasks.register("hybridRelease") {
   description = "Updates files for release and prints the Git commands to manually sign and push."
   group = "release"
-
   // Capture variables at configuration time to support Gradle Configuration Cache
   val currentVer = project.version.toString()
 

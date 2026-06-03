@@ -124,7 +124,9 @@ public class WorkLogConfig implements Runnable {
                 if (dryrun) {
                     System.out.println("======= DRY RUN MODE ENABLED =======");
                 }
+
                 Path outputDir = resolveOutputDirectory();
+
                 for (LocalDate date = startDate; !date.isAfter(endDate.get()); date = date.plusDays(1)) {
 
                     if (isWeekend(date)) {
@@ -133,7 +135,7 @@ public class WorkLogConfig implements Runnable {
                     }
 
                     if (isNZHoliday(date)) {
-                        System.out.println("======= Skipping Holiday " + HOLIDAYS_2026.get(date));
+                        System.out.println("======= Skipping new Zealand Holiday " + HOLIDAYS_2026.get(date));
                         continue;
                     }
 
@@ -149,22 +151,25 @@ public class WorkLogConfig implements Runnable {
                                     fileName);
                         }
                         continue;
-                    }
+                    } // end of dryrun check
 
                     var template = loadResource("templates/worklog-day.md");
                     var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
 
                     Files.writeString(filePath, fullMarkdownContent);
-                    System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
 
                     if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
                         try (BufferedWriter writer = Files.newBufferedWriter(filePath,
                                 java.nio.file.StandardOpenOption.APPEND)) {
+                            System.out.printf("======= Friday includes a Reflection section");
                             writer.write(textFridayTemplate);
                             System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
                         }
                     }
-                }
+                
+                    System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
+
+                } // end of for loop iterating over dates
             } catch (IOException e) {
                 System.err.println("Error creating markdown files: " + e.getMessage());
                 e.printStackTrace();
