@@ -1,16 +1,18 @@
 # java-utilities
 
-A collection of Java CLI utilities designed to automate repetitive tasks. This project is part of the `utilities-automation-toolbox` and provides a set of operations that can be run on-demand, weekly, or randomly to streamline developer workflows.
+A collection of Java CLI utilities designed to automate repetitive tasks.
+
+This project is part of the `utilities-automation-toolbox` and provides a set of operations that can be run on-demand, weekly, or randomly to streamline developer workflows.
 
 Currently, the primary tool included is the **WorkLog markdown generator**, which automates the creation of daily work logs in markdown format.
 
 ## CLI utility WorkLog markdown
 
-WorkLog is a Picocli-based CLI automation tool that generates daily markdown worklog files between a start and end date.
+WorkLog Markdown is a Picocli-based CLI automation tool used to generate markdown worklog files on demand using New Zealand Holidays.
 
 uses the format **File Name Format yyyy-MM-dd-EEEE.md** Example: `2026-03-17-Tuesday.md`
 
-## 📘 WorkLogConfig – Core Responsibilities & Usage Guide
+## 📘 WorkLogConfig – Core & Usage Guide
 
 ## Core Responsibilities
 
@@ -20,17 +22,13 @@ The tool uses **Picocli** to accept command‑line arguments:
 
 | Option              | Description                                                                     |
 | ------------------- | ------------------------------------------------------------------------------- |
-| `--start`, `-s`     | Start date (YYYY-MM-DD format)                                                  |
-| `--end`, `-e`       | End date (YYYY-MM-DD format)                                                    |
-| `--this-week`, `-t` | Automatically creates logs from the start of this business week to the end      |
-| `--dryrun`, `-d`    | Safely execute and mock the execution without creating any files                |
-| `--help`, `-h`      | Displays the help message                                                       |
+| `--help`, `-h`      | Displays the help message  and some extra commands to facilitate execution      |
 
 ***
 
 ## **Markdown File Generation**
 
-The utility generates **one `.md` file per business day** within the given date range.
+The utility generates 1 **markdown `.md` file per business day** within the given date range.
 
 ### **Content Behavior**
 
@@ -46,7 +44,7 @@ The utility generates **one `.md` file per business day** within the given date 
 
 ## 📋 Prerequisites
 
-Before building or running the utilities, ensure you have the following installed:
+Before building or running the utilities, ensure you have the following installed
 
 * **Java JDK 25**: The project uses Java 25 toolchain features.
 * **Gradle**: While the project includes a Gradle wrapper (`gradlew`), having Gradle installed locally can be helpful.
@@ -169,6 +167,7 @@ The testing suite focuses on verifying the core logic of the utilities without s
 ./gradlew test jacocoTestReport jacocoTestCoverageVerification
 
 #### run the test suite only for java-utilities sub-project
+
 ```bash
 ./gradlew :java-utilities:lib:test :java-utilities:lib:jacocoTestReport :java-utilities:lib:jacocoTestCoverageVerification
 ```
