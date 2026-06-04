@@ -70,17 +70,17 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, DECEMBER, 26), "Christmas Boxing Day"));
 
     static String textFridayTemplate = """
-<<<<<<< HEAD
-            %n## End of week Reflection | Learning & Next Goals%n
-=======
+            <<<<<<< HEAD
+                        %n## End of week Reflection | Learning & Next Goals%n
+            =======
 
-            ## End of week Reflection | Learning & Next Goals
+                        ## End of week Reflection | Learning & Next Goals
 
->>>>>>> main
-            1. week_reflection
-            2. week_learning
-            3. next_week_goal
-            """;
+            >>>>>>> main
+                        1. week_reflection
+                        2. week_learning
+                        3. next_week_goal
+                        """;
 
     static String loadResource(String resourcePath) {
         try (var in = WorkLogConfig.class.getClassLoader().getResourceAsStream(resourcePath)) {
@@ -159,14 +159,14 @@ public class WorkLogConfig implements Runnable {
                     Files.writeString(filePath, fullMarkdownContent);
 
                     if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                        System.out.printf("======= Friday includes extra Reflection section");
                         try (BufferedWriter writer = Files.newBufferedWriter(filePath,
                                 java.nio.file.StandardOpenOption.APPEND)) {
-                            System.out.printf("======= Friday includes a Reflection section");
                             writer.write(textFridayTemplate);
                             System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
                         }
-                    }
-                
+                    } // end of if block checking for Friday to add reflection template
+
                     System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
 
                 } // end of for loop iterating over dates

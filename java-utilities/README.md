@@ -77,7 +77,7 @@ the process is best executed in an environment that supports gpg for signing wit
 
 ## 🚀 Executing the Java utilities
 
-### Local Release Execution Fat Jar
+### Local Execution & Release Fat Jar
 
 execute from main branch and root gradle project directory. Simplified local build with the gradle wrapper to fix a specific gradle version
 
@@ -131,21 +131,22 @@ execute from main branch and root gradle project directory. Simplified local bui
 
 todo: implement a dynamic way to identify whether windows or linux
 
-### 🧪 local Development Unit Test Build & Run
+### 🧪 local Development Build Test & Run
 
-perform the steps locally for development purposes. I used WSL ubuntu 24 running from an enterprise windows11.
+#### Build stage
 
-* navigate to gradle project directory
+perform the steps locally for development purposes from the project directory. I used WSL ubuntu 24 running from an enterprise windows11.
+
 * run a clean Build
 
  ```bash
- gradle clean build 2>&1
+ ./gradlew clean build 2>&1
  ```
 
 * List Build Output
 
  ```bash
- ls -lh lib/build
+ ls -lh java-utilities/lib/build
  ```
 
 * Smoke test by running Help Command
@@ -154,32 +155,9 @@ perform the steps locally for development purposes. I used WSL ubuntu 24 running
  ./gradlew run --args="--help"
  ```
 
-* set start and end date
-
- ```bash
- START_DATE="2026-03-10"
- END_DATE="2026-03-21"
- ```
-
-* Run With Dry Run (Mock Execution)
-
-calculates starting the first business day of the week.
-
- ```bash
- ./gradlew run --args="--start $START_DATE --end $END_DATE --dryrun"
- ```
-
-* Run with flags long format and short format
-
-./gradlew run --args="-s 2026-05-20 --end=2026-05-23"
-
-***
-
-## ⚙️ CI with GitHub Actions
-
-The project includes a CI pipeline to ensure code quality and functionality. The workflow is designed to validate changes through automated testing.
-
 ### Testing Suite
+
+#### Test stage
 
 The testing suite focuses on verifying the core logic of the utilities without side effects (using dry runs)
 
@@ -190,17 +168,51 @@ The testing suite focuses on verifying the core logic of the utilities without s
 
 #### run the test suite only for java-utilities sub-project
 
-```bash
-./gradlew :java-utilities:lib:test :java-utilities:lib:jacocoTestReport :java-utilities:lib:jacocoTestCoverageVerification
-```
+  ```bash
+  ./gradlew :java-utilities:lib:test :java-utilities:lib:jacocoTestReport :java-utilities:lib:jacocoTestCoverageVerification
+  ```
 
-#### Smoke Test Execution
+#### Smoke Test a single test
 
 The smoke test validates the CLI configuration and basic execution flow:
 
-```bash
-./gradlew test --tests "org.utils.WorkLogConfigTest" --info | grep "testDryRun"
-```
+  ```bash
+  ./gradlew test --tests "org.utils.WorkLogConfigTest" --info | grep "testDryRun"
+  ```
+
+#### Execution stage
+
+* set start date from today and end date
+
+  ```bash
+  START_DATE="$(date +%F)"
+  END_DATE="2026-06-25"
+  ```
+
+* use today and tomorrow bash style
+
+  ```bash
+  START_DATE="$(date +%F)"
+  END_DATE="$(date --date="tomorrow" +%F)"
+  ```
+
+* Run With Dry Run (Mock Execution)
+
+  ```bash
+  ./gradlew run --args="--start $START_DATE --end $END_DATE --dryrun"
+  ```
+
+* Run with flags long format and short format
+
+  ```bash
+  ./gradlew run --args="-s 2026-05-20 --end=2026-05-23"
+  ```
+
+***
+
+## ⚙️ CI with GitHub Actions
+
+The project includes a CI pipeline to ensure code quality and functionality. The workflow is designed to validate changes through automated testing.
 
 The CI pipeline typically performs the following steps:
 
