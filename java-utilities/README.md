@@ -69,11 +69,7 @@ the process is best executed in an environment that supports gpg for signing wit
  ```
 
 * the CI workflow ⚙️ [Java Utilities CI/CD](https://github.com/aleon1220/utilities-automation-toolbox/actions/workflows/ci-cd-java-utilities.yml) runs automatically as soon as the git tag is pushed
-* a [Github release](https://github.com/aleon1220/utilities-automation-toolbox/releases) is automatically created with the jar library
-
- ```bash
- command_template
- ```
+* [Github release](https://github.com/aleon1220/utilities-automation-toolbox/releases) is automatically created with the jar library
 
 ## 🚀 Executing the Java utilities
 
@@ -139,21 +135,21 @@ perform the steps locally for development purposes from the project directory. I
 
 * run a clean Build
 
- ```bash
- ./gradlew clean build 2>&1
- ```
+  ```bash
+  ./gradlew clean build 2>&1
+  ```
 
 * List Build Output
 
- ```bash
- ls -lh java-utilities/lib/build
- ```
+  ```bash
+  ls -lh java-utilities/lib/build
+  ```
 
 * Smoke test by running Help Command
 
- ```bash
- ./gradlew run --args="--help"
- ```
+  ```bash
+  ./gradlew run --args="--help"
+  ```
 
 ### Testing Suite
 
@@ -163,8 +159,9 @@ The testing suite focuses on verifying the core logic of the utilities without s
 
 #### run the test suite
 
-```bash
-./gradlew test jacocoTestReport jacocoTestCoverageVerification
+  ```bash
+  ./gradlew test jacocoTestReport jacocoTestCoverageVerification
+  ```
 
 #### run the test suite only for java-utilities sub-project
 
