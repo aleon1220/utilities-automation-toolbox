@@ -52,6 +52,29 @@ Before building or running the utilities, ensure you have the following installe
 
 ***
 
+## Signed release process 📟📦
+
+the process is best executed in an environment that supports gpg for signing with encryption keys the tag/commit
+
+* check current version
+
+ ```bash
+ git tag
+ ```
+
+* run the gradle function prepared to handle the hybrid release
+
+ ```bash
+ ./gradlew hybridRelease
+ ```
+
+* the CI workflow ⚙️ [Java Utilities CI/CD](https://github.com/aleon1220/utilities-automation-toolbox/actions/workflows/ci-cd-java-utilities.yml) runs automatically as soon as the git tag is pushed
+* a [Github release](https://github.com/aleon1220/utilities-automation-toolbox/releases) is automatically created with the jar library
+
+ ```bash
+ command_template
+ ```
+
 ## 🚀 Executing the Java utilities
 
 ### Local Release Execution Fat Jar
@@ -61,7 +84,6 @@ execute from main branch and root gradle project directory. Simplified local bui
 * check current version
 
  ```bash
- git tag
  ./gradlew currentVersion
  ```
 
