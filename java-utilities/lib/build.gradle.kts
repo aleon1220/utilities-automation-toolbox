@@ -95,23 +95,17 @@ version = scmVersion.version
 // Optional: standard group configuration
 group = "org.aleon1220.utilities"
 
-tasks.register("printVersion") {
-  doLast { println("Calculated Project Version: ${project.version}") }
-}
-
 tasks.register("getVersion") {
   // Description helps document the task if you run ./gradlew tasks
   description = "Prints the raw project version for script consumption"
   group = "help"
-
   val projectVersion = project.version.toString()
-  print(projectVersion)
+  doLast { print(projectVersion) }
 }
 
 tasks.register("hybridRelease") {
   description = "Updates files for release and prints the Git commands to manually sign and push."
   group = "release"
-
   // Capture variables at configuration time to support Gradle Configuration Cache
   val currentVer = project.version.toString()
 
@@ -130,20 +124,3 @@ tasks.register("hybridRelease") {
   }
 }
 
-// 2. Configure the Semantic Versioning behavior
-scmVersion {
-  println("Calculate app utility Version")
-  // Auto-detect commit types to determine the NEXT version
-  // - Commits with "feat:" = MINOR bump
-  // - Commits with "fix:" (or default) = PATCH bump
-  // - MAJOR bumps remain manual (via explicit tagging)
-  // versionIncrementer.set("conventionalCommits")
-  // Automatically append -SNAPSHOT if the current commit doesn't have a tag
-  println("Calculated Git Version: ${scmVersion.version}")
-}
-
-// 3. Bind the calculated Git version to the Gradle project
-project.version = scmVersion.version
-
-// Optional: standard group configuration
-group = "org.aleon1220.utilities"

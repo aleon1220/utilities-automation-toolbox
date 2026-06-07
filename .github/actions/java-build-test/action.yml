@@ -12,17 +12,17 @@ inputs:
 outputs:
   app-utils-version:
     description: 'version being created'
-    value: ${{ steps.build.outputs.app-utils-version }}
+    value: ${{ steps.obtain-outputs.outputs.app-utils-version }}
   app-utils-fat-jar:
     description: 'Path to the generated Fat JAR artifact'
-    value: ${{ steps.build.outputs.app-utils-fat-jar }}
+    value: ${{ steps.obtain-outputs.outputs.app-utils-fat-jar }}
 
 runs:
   using: 'composite'
   steps:
     - name: Setup Java
-      uses: actions/setup-java@v5
-      # https://github.com/marketplace/actions/setup-java-jdk?version=v5.0.0
+      uses: actions/setup-java@v5.2.0
+      # https://github.com/marketplace/actions/setup-java-jdk
       with:
         distribution: 'microsoft'
         java-version: ${{ inputs.java-version }}
@@ -38,8 +38,13 @@ runs:
       run: |
         gradle wrapper
         chmod +x gradlew
+        echo "================= built & prepared Gradle wrapper =================="
+        ./gradlew spotlessApply
+        echo "================= Linted Gradle Kotlin Files =================="
+        
         echo "================= Executing Test Suite =================="
         ./gradlew test
+        echo "================= Test Suite completed =================="
 
     - name: Build the Fat JAR Test with Gradle
       id: build
@@ -48,12 +53,31 @@ runs:
       run: |
         gradle wrapper
         chmod +x gradlew
+        echo "================= built & prepared Gradle wrapper =================="
+
         echo "================= checking location $PWD =================="
         ls -lha
+
         echo "================= Building the project and creating the Fat JAR =================="
         ./gradlew clean build shadowJar
-        UTIL_APP_VERSION=$(./gradlew -q getVersion)
+        echo "================= completed Build the Fat JAR =================="
+
+    - name: extract version and jar name for outputs
+      id: obtain-outputs
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "================= extracting outputs and version =================="
+        gradle wrapper
+        chmod +x gradlew
+        echo "================= built & prepared Gradle wrapper =================="
+
+        UTIL_APP_VERSION=$(./gradlew -q :java-utilities:lib:getVersion)
         UTIL_JAR_NAME="lib-$UTIL_APP_VERSION-all.jar"
+        
+        # append to GITHUB_OUTPUT is the recommended way to set outputs in composite actions
         echo "app-utils-version=$UTIL_APP_VERSION" >> $GITHUB_OUTPUT
         echo "app-utils-fat-jar=$UTIL_JAR_NAME" >> $GITHUB_OUTPUT
-        echo "================= completed Build the Fat JAR =================="
+        echo "================= extracted outputs =================="
+
+    

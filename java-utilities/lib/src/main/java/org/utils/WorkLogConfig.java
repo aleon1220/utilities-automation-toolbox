@@ -73,8 +73,8 @@ public class WorkLogConfig implements Runnable {
 
     static String textFridayTemplate = """
 
-            ## End of week Reflection | Learning & Next Goals
-
+            ## End of week Reflection 
+            
             1. week_reflection
             2. week_learning
             3. next_week_goal
@@ -152,7 +152,7 @@ public class WorkLogConfig implements Runnable {
                                     fileName);
                         }
                         continue;
-                    } // end of dryrun check
+                    } // end of dryrun check // end of dryrun check
 
                     var template = loadResource("templates/worklog-day.md");
                     var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
@@ -163,14 +163,14 @@ public class WorkLogConfig implements Runnable {
                         System.out.printf("======= Friday includes extra Reflection section");
                         try (BufferedWriter writer = Files.newBufferedWriter(filePath,
                                 java.nio.file.StandardOpenOption.APPEND)) {
+                            System.out.printf("======= Friday includes a Reflection section");
                             writer.write(textFridayTemplate);
                             System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
                         }
                     } // end of if block checking for Friday to add reflection template
 
                     System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
-
-                } // end of inner for loop iterating over dates
+                } // end of inner for loop iterating over dates // end of for loop iterating over dates
             } catch (IOException e) {
                 System.err.println("Error creating markdown files: " + e.getMessage());
                 e.printStackTrace();

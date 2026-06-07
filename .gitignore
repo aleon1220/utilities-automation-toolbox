@@ -1,38 +1,38 @@
-# OS / editors
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# Python
-__pycache__/
-*.pyc
-.venv/
-.env
-
-# Java
-target/
-*.class
-*.jar
-*.war
-*.ear
-
-# PowerShell
-*.ps1xml
-# (add any transient logs or output dirs you generate)
-
-# General
-logs/
-*.log
-"@ | Out-File -Encoding utf8 .gitignore
-
-# IDE IntelliJ IDEA
-/out/
-.idea/
-*.iml
-*.iws
-*.ipr
-
-# Gradle caches and generated build output
+# Gradle
+# Ignore Gradle project-specific cache directory
 .gradle/
-build/
+
+**/build/
+!src/**/build/
+
+# Ignore Gradle project-specific cache directory
+.gradle
+
+# Ignore Gradle build output directory
+build
+
+# Ignore Kotlin plugin data
+.kotlin
+
+# Ignore Gradle build output directory
+build
+build/reports/
+
+# the lib creates custom structures
+bin/main
+bin
+
+# Ignore IntelliJ IDEA project files
+.idea
+*.iml
+
+*.class
+*.log
+*.tmp
+*.swp
+*.DS_Store
+*.bak
+*.orig
+*.rej
+*.swo
+*.swn
