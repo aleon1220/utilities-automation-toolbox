@@ -13,11 +13,11 @@ This repo operates as the orchestrator repo for other git repos.
 
 ## Structure
 
-where there is a native replacement e.g. `aws-cli` instead of python `boto3` it will be linked and notified.
 
-- `java-utilities/`
-- `powershell-utilities/`
-- `python-utilities/`
+
+- [java-utilities](java-utilities)
+- [powershell-utilities](powershell-utilities/)
+- [python-utilities](python-utilities/)
 
 ### java-utilities release new version
 
@@ -32,3 +32,4 @@ where there is a native replacement e.g. `aws-cli` instead of python `boto3` it 
 - from windows 11 enterprise edition I have a WSL layer with Linux Ubuntu distro
 - from windows 10 PC I have a WSL layer with Linux RHEL
 - Lenovo Laptop with Ubuntu 24
+- preference to a native replacement e.g. `aws-cli` instead of python `boto3` it will be linked and notified.
