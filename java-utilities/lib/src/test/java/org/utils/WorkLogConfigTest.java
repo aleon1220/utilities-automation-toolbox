@@ -5,7 +5,10 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -141,6 +144,30 @@ class WorkLogConfigTest {
     }
 
     @Test
+    void testCreateMarkdownFilesDryRunDoesNotDuplicateDates(@TempDir Path tempDir) {
+        WorkLogConfig config = new WorkLogConfig();
+        config.dryrun = true;
+        config.baseOutputDir = tempDir.toString();
+        config.startDate = Optional.of(LocalDate.of(2026, 3, 5)); // Thursday
+        config.endDate = Optional.of(LocalDate.of(2026, 3, 6)); // Friday
+
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        try {
+            System.setOut(new PrintStream(outputStream, true, StandardCharsets.UTF_8));
+            config.createMarkdownFiles();
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String output = outputStream.toString(StandardCharsets.UTF_8);
+
+        assertThat(countOccurrences(output, "Would create file 2026-03-05-Thursday.md")).isEqualTo(1);
+        assertThat(countOccurrences(output, "Would create file 2026-03-06-Friday.md")).isEqualTo(1);
+    }
+
+    @Test
     void testCreateMarkdownFilesInvalidRange() {
         WorkLogConfig config = new WorkLogConfig();
         config.startDate = Optional.empty(); // missing
@@ -166,5 +193,17 @@ class WorkLogConfigTest {
         assertThat(content).contains("Initial content");
         assertThat(content).contains("extra data");
         assertThat(content).contains("appending");
+    }
+
+    private static int countOccurrences(String text, String search) {
+        int count = 0;
+        int index = 0;
+
+        while ((index = text.indexOf(search, index)) != -1) {
+            count++;
+            index += search.length();
+        }
+
+        return count;
     }
 }

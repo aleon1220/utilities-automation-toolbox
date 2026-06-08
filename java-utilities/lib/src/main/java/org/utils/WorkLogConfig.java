@@ -12,7 +12,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
 import java.util.Optional;
 
 import picocli.CommandLine;
@@ -83,77 +82,65 @@ public class WorkLogConfig implements Runnable {
     }
 
     public void createMarkdownFiles(LocalDate startDate) {
-        // dynamic calculate the end of the month based on the passed-in date
-        LocalDate endOfMonth = startDate.with(TemporalAdjusters.lastDayOfMonth());
+        if (!isValidDateRange(startDate, endDate.get())) {
+            System.out.println("======= Invalid date range");
+            return;
+        }
 
-        // the outer loop contains an inner loop. todo: refactor this as i am getting
-        // duplicate outcome
-        for (LocalDate current = startDate; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
-
-            if (isWeekend(current) || isNZHoliday(current)) {
-                continue; // Skips weekends and holidays cleanly
+        try {
+            if (dryrun) {
+                System.out.println("🧪 ======= DRY RUN MODE ENABLED =======");
             }
 
-            if (!isValidDateRange(startDate, endDate.get())) {
-                System.out.println("======= Invalid date range");
-                return;
-            }
+            Path outputDir = resolveOutputDirectory();
 
-            try {
-                if (dryrun) {
-                    System.out.println("🧪 ======= DRY RUN MODE ENABLED =======");
+            for (LocalDate date = startDate; !date.isAfter(endDate.get()); date = date.plusDays(1)) {
+
+                if (isWeekend(date)) {
+                    System.out.println("======= Skipping Weekend for " + formatDateForFileName(date));
+                    continue;
                 }
 
-                Path outputDir = resolveOutputDirectory();
+                if (isNZHoliday(date)) {
+                    System.out.println("======= Skipping new Zealand Holiday " + Holidays.getNZHolidayName(date));
+                    continue;
+                }
 
-                for (LocalDate date = startDate; !date.isAfter(endDate.get()); date = date.plusDays(1)) {
+                var standardizedDateName = formatDateForFileName(date);
+                String fileName = standardizedDateName + ".md";
+                Path filePath = outputDir.resolve(fileName);
 
-                    if (isWeekend(date)) {
-                        System.out.println("======= Skipping Weekend for " + formatDateForFileName(date));
-                        continue;
-                    }
-
-                    if (isNZHoliday(date)) {
-                        System.out.println("======= Skipping new Zealand Holiday " + Holidays.getNZHolidayName(date));
-                        continue;
-                    }
-
-                    var standardizedDateName = formatDateForFileName(date);
-                    String fileName = standardizedDateName + ".md";
-                    Path filePath = outputDir.resolve(fileName);
-
-                    if (dryrun) {
-                        System.out.printf("======= 📝 [DRY RUN] Would create file %s at path %s %n", fileName,
-                                filePath);
-                        if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                            System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n",
-                                    fileName);
-                        }
-                        continue;
-                    } // end of dryrun check // end of dryrun check
-
-                    var template = loadResource("templates/worklog-day.md");
-                    var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
-
-                    Files.writeString(filePath, fullMarkdownContent);
-
+                if (dryrun) {
+                    System.out.printf("======= 📝 [DRY RUN] Would create file %s at path %s %n", fileName,
+                            filePath);
                     if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                        System.out.printf("======= Friday includes extra Reflection section");
-                        try (BufferedWriter writer = Files.newBufferedWriter(filePath,
-                                java.nio.file.StandardOpenOption.APPEND)) {
-                            System.out.printf("======= Friday includes a Reflection section");
-                            writer.write(textFridayTemplate);
-                            System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
-                        }
-                    } // end of if block checking for Friday to add reflection template
+                        System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n",
+                                fileName);
+                    }
+                    continue;
+                } // end of dryrun check // end of dryrun check
 
-                    System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
-                } // end of inner for loop iterating over dates // end of for loop iterating over dates
-            } catch (IOException e) {
-                System.err.println("Error creating markdown files: " + e.getMessage());
-                e.printStackTrace();
-            } // end of catch block
-        } // end of Outer for loop iterating over dates
+                var template = loadResource("templates/worklog-day.md");
+                var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
+
+                Files.writeString(filePath, fullMarkdownContent);
+
+                if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                    System.out.printf("======= Friday includes extra Reflection section");
+                    try (BufferedWriter writer = Files.newBufferedWriter(filePath,
+                            java.nio.file.StandardOpenOption.APPEND)) {
+                        System.out.printf("======= Friday includes a Reflection section");
+                        writer.write(textFridayTemplate);
+                        System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
+                    }
+                } // end of if block checking for Friday to add reflection template
+
+                System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
+            } // end of for loop iterating over dates
+        } catch (IOException e) {
+            System.err.println("Error creating markdown files: " + e.getMessage());
+            e.printStackTrace();
+        } // end of catch block
     } // end of createMarkdownFiles()
 
     // todo: this method is an attempt to append content. Simplify and generalise
