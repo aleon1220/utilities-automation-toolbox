@@ -7,13 +7,12 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.Map;
-
 import static java.time.Month.JANUARY;
 import static java.time.Month.FEBRUARY;
 import static java.time.Month.APRIL;
@@ -21,6 +20,8 @@ import static java.time.Month.JUNE;
 import static java.time.Month.OCTOBER;
 import static java.time.Month.DECEMBER;
 import static java.time.Month.JULY;
+
+import java.util.Map;
 import static java.util.Map.entry;
 import java.util.Optional;
 
@@ -30,9 +31,13 @@ import picocli.CommandLine.Option;
 
 // The @CommandLineSchema annotation tells the JVM how to map args to this record
 @Command(name = "worklog", description = "%nWork log markdown file creator%n", footer = {
-        "%nExample: create logs March 2026",
-        "   worklog --start 2026-03-01 --end 2026-03-31",
-        "   worklog -s 2026-03-01 -e 2026-03-31"
+        "%nExamples:",
+        "  Create logs for March 2026:",
+        "    worklog --start 2026-03-01 --end 2026-03-31",
+        "    worklog -s 2026-03-01 -e 2026-03-31",
+        "  Create logs for the current work week:",
+        "    worklog --this-week",
+        "    worklog -t"
 }, sortOptions = false, requiredOptionMarker = '*', showDefaultValues = true)
 
 public class WorkLogConfig implements Runnable {
@@ -54,8 +59,8 @@ public class WorkLogConfig implements Runnable {
     @Option(names = { "-o", "--out" }, description = "Base output directory", defaultValue = "/mnt/c/workspace/TESTS")
     String baseOutputDir;
 
-    // todo: add holidays to separate class
-
+    // todo: add holidays to separate class and in that class stub a method to get
+    // the holidays for a given year and country makng code more modular and easier to maintain
     static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
             entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
             entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
@@ -70,16 +75,13 @@ public class WorkLogConfig implements Runnable {
             entry(LocalDate.of(2026, DECEMBER, 26), "Christmas Boxing Day"));
 
     static String textFridayTemplate = """
-<<<<<<< HEAD
-            %n## End of week Reflection | Learning & Next Goals%n
-=======
 
-            ## End of week Reflection | Learning & Next Goals
-
->>>>>>> main
+            ## End of week Reflection 
+            
             1. week_reflection
             2. week_learning
             3. next_week_goal
+
             """;
 
     static String loadResource(String resourcePath) {
@@ -89,8 +91,8 @@ public class WorkLogConfig implements Runnable {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to read resource: " + resourcePath, e);
-        }
-    }
+        } // end of catch
+    } // end of loadResource()
 
     static String formatDateForFileName(LocalDate date) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-EEEE");
@@ -109,6 +111,8 @@ public class WorkLogConfig implements Runnable {
         // dynamic calculate the end of the month based on the passed-in date
         LocalDate endOfMonth = startDate.with(TemporalAdjusters.lastDayOfMonth());
 
+        // the outer loop contains an inner loop. todo: refactor this as i am getting
+        // duplicate outcome
         for (LocalDate current = startDate; !current.isAfter(endOfMonth); current = current.plusDays(1)) {
 
             if (isWeekend(current) || isNZHoliday(current)) {
@@ -122,7 +126,7 @@ public class WorkLogConfig implements Runnable {
 
             try {
                 if (dryrun) {
-                    System.out.println("======= DRY RUN MODE ENABLED =======");
+                    System.out.println("🧪 ======= DRY RUN MODE ENABLED =======");
                 }
 
                 Path outputDir = resolveOutputDirectory();
@@ -144,14 +148,14 @@ public class WorkLogConfig implements Runnable {
                     Path filePath = outputDir.resolve(fileName);
 
                     if (dryrun) {
-                        System.out.printf("======= 🛠️ [DRY RUN] Would create file %s at path %s %n", fileName,
+                        System.out.printf("======= 📝 [DRY RUN] Would create file %s at path %s %n", fileName,
                                 filePath);
                         if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
                             System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n",
                                     fileName);
                         }
                         continue;
-                    } // end of dryrun check
+                    } // end of dryrun check // end of dryrun check
 
                     var template = loadResource("templates/worklog-day.md");
                     var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
@@ -159,33 +163,34 @@ public class WorkLogConfig implements Runnable {
                     Files.writeString(filePath, fullMarkdownContent);
 
                     if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
+                        System.out.printf("======= Friday includes extra Reflection section");
                         try (BufferedWriter writer = Files.newBufferedWriter(filePath,
                                 java.nio.file.StandardOpenOption.APPEND)) {
                             System.out.printf("======= Friday includes a Reflection section");
                             writer.write(textFridayTemplate);
                             System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
                         }
-                    }
-                
-                    System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
+                    } // end of if block checking for Friday to add reflection template
 
-                } // end of for loop iterating over dates
+                    System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
+                } // end of inner for loop iterating over dates // end of for loop iterating over dates
             } catch (IOException e) {
                 System.err.println("Error creating markdown files: " + e.getMessage());
                 e.printStackTrace();
             } // end of catch block
-        } // end of for loop iterating over dates
+        } // end of Outer for loop iterating over dates
     } // end of createMarkdownFiles()
 
     // todo: this method is an attempt to append content. Simplify and generalise
+    // todo: it can be exposed as functionality in the CLI
     public static void addContentToMarkdownFile(String overrideMarkdownFilePath, String xtraMarkdownContent) {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFilePath, true))) {
             var headerWorkLogDayFormatted = String.format("## %s appending %n", formatDateForFileName(LocalDate.now()));
-            System.out.println("======= markdown content to add: " + headerWorkLogDayFormatted + xtraMarkdownContent);
+            System.out.println("======= ⏭️ markdown content to add: " + headerWorkLogDayFormatted + xtraMarkdownContent);
             writer.write(headerWorkLogDayFormatted);
             writer.write(xtraMarkdownContent);
             writer.newLine();
-            System.out.println("======= markdown override added to file " + overrideMarkdownFilePath);
+            System.out.println("======= 📝 markdown override added to file " + overrideMarkdownFilePath);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -259,7 +264,7 @@ public class WorkLogConfig implements Runnable {
         if (startDate.isPresent() && endDate.isPresent()) {
             createMarkdownFiles(startDate.get());
         } else {
-            System.out.println("======= Start and end dates are required or use --this-week");
+            System.out.println("======= Start - end dates are require. Use --this-week");
             new CommandLine(this).usage(System.out);
         }
     }

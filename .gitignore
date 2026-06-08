@@ -21,3 +21,18 @@ build/reports/
 # the lib creates custom structures
 bin/main
 bin
+
+# Ignore IntelliJ IDEA project files
+.idea
+*.iml
+
+*.class
+*.log
+*.tmp
+*.swp
+*.DS_Store
+*.bak
+*.orig
+*.rej
+*.swo
+*.swn
