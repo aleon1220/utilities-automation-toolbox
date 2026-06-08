@@ -32,4 +32,6 @@ This repo operates as the orchestrator repo for other git repos.
 - from windows 11 enterprise edition I have a WSL layer with Linux Ubuntu distro
 - from windows 10 PC I have a WSL layer with Linux RHEL
 - Lenovo Laptop with Ubuntu 24
-- preference to a native replacement e.g. `aws-cli` instead of python `boto3` it will be linked and notified.
+- Fixed `WorkLogConfig` tests by adding method overload for backward compatibility.
+- Implemented CLI footer examples for `--this-week` in `WorkLogConfig`.
+- Extracted holidays logic to a separate `Holidays` class for modularity.
