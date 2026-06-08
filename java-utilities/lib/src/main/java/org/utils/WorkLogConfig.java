@@ -13,16 +13,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import static java.time.Month.JANUARY;
-import static java.time.Month.FEBRUARY;
-import static java.time.Month.APRIL;
-import static java.time.Month.JUNE;
-import static java.time.Month.OCTOBER;
-import static java.time.Month.DECEMBER;
-import static java.time.Month.JULY;
-
-import java.util.Map;
-import static java.util.Map.entry;
 import java.util.Optional;
 
 import picocli.CommandLine;
@@ -58,21 +48,6 @@ public class WorkLogConfig implements Runnable {
 
     @Option(names = { "-o", "--out" }, description = "Base output directory", defaultValue = "/mnt/c/workspace/TESTS")
     String baseOutputDir;
-
-    // todo: add holidays to separate class and in that class stub a method to get
-    // the holidays for a given year and country makng code more modular and easier to maintain
-    static final Map<LocalDate, String> HOLIDAYS_2026 = Map.ofEntries(
-            entry(LocalDate.of(2026, JANUARY, 1), "New Year's Day"),
-            entry(LocalDate.of(2026, FEBRUARY, 6), "Waitangi Day"),
-            entry(LocalDate.of(2026, APRIL, 3), "Holy Week - Friday"),
-            entry(LocalDate.of(2026, APRIL, 6), "Holy Week - Easter Monday"),
-            entry(LocalDate.of(2026, APRIL, 25), "ANZAC official Day"),
-            entry(LocalDate.of(2026, APRIL, 27), "ANZAC Monday Holiday"),
-            entry(LocalDate.of(2026, JUNE, 1), "UK Royalty Birthday"),
-            entry(LocalDate.of(2026, JULY, 10), "Matariki"),
-            entry(LocalDate.of(2026, OCTOBER, 26), "Labour Day"),
-            entry(LocalDate.of(2026, DECEMBER, 25), "Christmas Day"),
-            entry(LocalDate.of(2026, DECEMBER, 26), "Christmas Boxing Day"));
 
     static String textFridayTemplate = """
 
@@ -139,7 +114,7 @@ public class WorkLogConfig implements Runnable {
                     }
 
                     if (isNZHoliday(date)) {
-                        System.out.println("======= Skipping new Zealand Holiday " + HOLIDAYS_2026.get(date));
+                        System.out.println("======= Skipping new Zealand Holiday " + Holidays.getNZHolidayName(date));
                         continue;
                     }
 
@@ -241,7 +216,7 @@ public class WorkLogConfig implements Runnable {
 
     static boolean isNZHoliday(LocalDate date) {
         // Returns TRUE if it IS a holiday (Simple check)
-        return HOLIDAYS_2026.containsKey(date);
+        return Holidays.isNZHoliday(date);
     }
 
     static boolean isWeekend(LocalDate date) {

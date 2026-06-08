@@ -34,3 +34,4 @@ This repo operates as the orchestrator repo for other git repos.
 - Lenovo Laptop with Ubuntu 24
 - Fixed `WorkLogConfig` tests by adding method overload for backward compatibility.
 - Implemented CLI footer examples for `--this-week` in `WorkLogConfig`.
+- Extracted holidays logic to a separate `Holidays` class for modularity.
