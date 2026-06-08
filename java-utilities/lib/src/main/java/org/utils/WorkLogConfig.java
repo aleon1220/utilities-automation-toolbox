@@ -31,10 +31,13 @@ import picocli.CommandLine.Option;
 
 // The @CommandLineSchema annotation tells the JVM how to map args to this record
 @Command(name = "worklog", description = "%nWork log markdown file creator%n", footer = {
-        "%nExample: create logs March 2026",
-        // todo: add the this week example only
-        "   worklog --start 2026-03-01 --end 2026-03-31",
-        "   worklog -s 2026-03-01 -e 2026-03-31"
+        "%nExamples:",
+        "  Create logs for March 2026:",
+        "    worklog --start 2026-03-01 --end 2026-03-31",
+        "    worklog -s 2026-03-01 -e 2026-03-31",
+        "  Create logs for the current work week:",
+        "    worklog --this-week",
+        "    worklog -t"
 }, sortOptions = false, requiredOptionMarker = '*', showDefaultValues = true)
 
 public class WorkLogConfig implements Runnable {
