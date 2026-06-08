@@ -110,15 +110,25 @@ tasks.register("hybridRelease") {
   val currentVer = project.version.toString()
 
   doLast {
-    // Axion-release sets the snapshot version to <previous-tag>-SNAPSHOT
-    // The actual release version needs to increment the patch number.
-    println("\n🚀 ✨ === Hybrid Release Ready === ✨ 🚀")
-    println("🏃 Run the following commands to commit 💾, sign 🔐, tag 🏷️, and push ☁️:")
-    println("➕ 📝 README last minute edits git add . ; git commit --gpg-sign --signoff ; git push ")
+    println("\n🚀 ✨ === Hybrid Release Executing === ✨ 🚀")
+
+    val branchProcess = ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD").start()
+    val branch = branchProcess.inputStream.bufferedReader().readText().trim()
+
+    if (branch == "main") {
+      println("🏷️  Creating tag v$currentVer and pushing...")
+      ProcessBuilder("git", "tag", "--sign", "v$currentVer", "--message", "Release v$currentVer")
+          .inheritIO().start().waitFor()
+      ProcessBuilder("bash", "-c", "git push && git push --tags")
+          .inheritIO().start().waitFor()
+    } else {
+      println("⚠️  Not on 'main' branch (current: $branch). Skipping auto tag and push.")
+    }
+
     println("--------------------------------------------------")
+    println("🏃 Extra commands (Suggestions):")
+    println("➕ 📝 README last minute edits git add . ; git commit --gpg-sign --signoff ; git push ")
     println("📝  --message release: bump version to $currentVer ")
-    println("🏷️  git tag --sign v$currentVer --message \"Release v$currentVer\"  ")
-    println("☁️  git push && git push --tags")
     println("--------------------------------------------------")
     println("🎉  Happy Releasing! 🥳")
   }
