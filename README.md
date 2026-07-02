@@ -13,8 +13,6 @@ This repo operates as the orchestrator repo for other git repos.
 
 ## Structure
 
-
-
 - [java-utilities](java-utilities)
 - [powershell-utilities](powershell-utilities/)
 - [python-utilities](python-utilities/)
@@ -23,7 +21,7 @@ This repo operates as the orchestrator repo for other git repos.
 
 1. Merge PR to main branch
 2. check tasks `./gradlew tasks --all`
-3. From a linux machine or WSL with a GPG key create the new tag
+3. From a linux machine or WSL with a GPG key create the new tag: use gradle function `hybridRelease`
 4. from Github validate tag
 5. GH Actions trigger the workflow CI/CD and release happens automatically
 
@@ -34,3 +32,4 @@ This repo operates as the orchestrator repo for other git repos.
 - Lenovo Laptop with Ubuntu 24
 - Fixed `WorkLogConfig` tests by adding method overload for backward compatibility.
 - Implemented CLI footer examples for `--this-week` in `WorkLogConfig`.
+- Extracted holidays logic to a separate `Holidays` class for modularity.
