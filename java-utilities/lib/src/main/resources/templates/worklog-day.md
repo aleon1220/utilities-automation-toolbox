@@ -43,10 +43,10 @@
 1. todo
 2. todo
 
-### Day Reflection & Learning
+### Day Reflection & Learning ☑
 
 1. Day reflection todo_add_reflection
-2. Day learning todo_add_learning
+2. Day learning todo_add_learning ✓
 
 ### Timesheet submission
 
