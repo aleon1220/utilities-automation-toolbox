@@ -127,6 +127,46 @@ execute from main branch and root gradle project directory. Simplified local bui
 
 todo: implement a dynamic way to identify whether windows or linux
 
+### Fetch and Run Latest java archive from GitHub Release
+
+You can download and execute the latest release directly by fetching the version via the GitHub API and running it in the standardized sandbox pattern:
+
+
+* Set up the execution sandbox
+
+```bash
+EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
+mkdir -pv "$EXECUTION_SANDBOX"
+pushd "$EXECUTION_SANDBOX" || exit
+```
+
+
+* Fetch the latest release version tag from GitHub API
+
+```bash
+LATEST_VERSION=$(curl -s https://api.github.com/repos/aleon1220/utilities-automation-toolbox/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
+UTIL_JAR_NAME="lib-${LATEST_VERSION#v}-all.jar"
+```
+
+* Download the latest release JAR
+
+```bash
+wget --verbose "https://github.com/aleon1220/utilities-automation-toolbox/releases/download/${LATEST_VERSION}/${UTIL_JAR_NAME}"
+```
+
+* use `curl` instead of `wget`
+
+```bash
+curl --verbose --location --remote-name "https://github.com/aleon1220/utilities-automation-toolbox/releases/download/${LATEST_VERSION}/${UTIL_JAR_NAME}"
+```
+
+* Smoke test the execution
+
+```bash
+java -jar "$UTIL_JAR_NAME" --this-week --dryrun
+```
+
 ### 🧪 local Development Build Test & Run
 
 #### Build stage
