@@ -127,7 +127,7 @@ execute from main branch and root gradle project directory. Simplified local bui
 
 todo: implement a dynamic way to identify whether windows or linux
 
-### Fetch and Run Latest java archive from GitHub Release
+### Fetch and Run Latest Java archive from GitHub Release
 
 You can download and execute the latest release directly by fetching the version via the GitHub API and running it in the standardized sandbox pattern:
 
