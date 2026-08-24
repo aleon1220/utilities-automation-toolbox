@@ -1,6 +1,6 @@
 param (
     [string]$from,
-    [string[]]$seconds
+    [string]$seconds
 )
 
 if (-not $from -and -not $seconds) {
@@ -36,7 +36,7 @@ try {
     $videoDir = $videoFile.DirectoryName
     $videoBaseName = $videoFile.BaseName
     
-    $secondsArray = $seconds | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+    $secondsArray = $seconds -split ',' | ForEach-Object { $_.Trim() }
 
     foreach ($sec in $secondsArray) {
         if (-not [int]::TryParse($sec, [ref]$null)) {
