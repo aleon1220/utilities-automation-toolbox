@@ -111,23 +111,29 @@ tasks.register("hybridRelease") {
 
   doLast {
     println("\n🚀 ✨ === Hybrid Release Executing === ✨ 🚀")
-
     val branchProcess = ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD").start()
     val branch = branchProcess.inputStream.bufferedReader().readText().trim()
 
     if (branch == "main") {
-      println("🏷️  Creating tag v$currentVer and pushing...")
-      ProcessBuilder("git", "tag", "--sign", "v$currentVer", "--message", "Release v$currentVer")
-          .inheritIO().start().waitFor()
-      ProcessBuilder("bash", "-c", "git push && git push --tags")
-          .inheritIO().start().waitFor()
+      println("🏷️  Creating tag v$currentVer for branch $branch ...")
+      // ProcessBuilder("git", "tag", "--sign", "v$currentVer", "--message", "Release v$currentVer")
+      //     .inheritIO().start().waitFor()
+      // ProcessBuilder("bash", "-c", "git push && git push --tags")
+      //     .inheritIO().start().waitFor()
+      println("🏷️ Using WSL from windows??? Create manually tag current version v$currentVer")
+      println("🏷️  git tag --sign v$currentVer --message \"used Google Antigravity\" ")
+      println("🏷️ git -c core.sshCommand=\"/usr/bin/ssh -i ~/.ssh/id_rsa_personal\" push && git -c core.sshCommand=\"/usr/bin/ssh -i ~/.ssh/id_rsa_personal\" push --tags")
+      println("🏷️ Linux now signs with a Yubi Key containing the GPG key. Manually tag current version v$currentVer")
+      println("git add . ; git commit --gpg-sign --signoff ; git push ")
     } else {
       println("⚠️  Not on 'main' branch (current: $branch). Skipping auto tag and push.")
     }
 
     println("--------------------------------------------------")
     println("🏃 Extra commands (Suggestions):")
-    println("➕ 📝 README last minute edits git add . ; git commit --gpg-sign --signoff ; git push ")
+    println("➕ 📝 README last minute edits ")
+    println("Avoid doing this after tagging, as it will require a new tag.")
+    println("git add . ; git commit --gpg-sign --signoff ; git push ")
     println("📝  --message release: bump version to $currentVer ")
     println("--------------------------------------------------")
     println("🎉  Happy Releasing! 🥳")
