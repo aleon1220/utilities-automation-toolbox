@@ -100,3 +100,4 @@ You can run smoke tests against the CLI directly using Gradle:
 - [ ] **Dynamic & Multi-Year Holiday Support**: Expand `Holidays.java` to dynamically calculate Easter/movable holidays or support multi-year / multi-region holiday sets.
 - [ ] **Customizable Templates**: Allow users to specify external template files via CLI parameters instead of relying solely on built-in classpath resources.
 - [ ] **Configurable Work Schedules**: Support custom work-week definitions (e.g. 4-day work weeks or custom weekend days).
+- [ ] javadoc has 16 warnings
