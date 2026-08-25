@@ -1,0 +1,3 @@
+workflow disable scheduled execution
+
+* avoids creating new branches with no previously merged branches

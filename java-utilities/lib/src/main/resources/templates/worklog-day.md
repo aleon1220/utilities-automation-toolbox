@@ -8,13 +8,13 @@
 
 ### Systems to leverage
 
-1. Boards Planning System [Trello](https://trello.com/c/63qYHZ9V)
-2. Client planning system
-3. Work plans
+* Boards Planning System [Trello](https://trello.com/c/63qYHZ9V)
+* Client planning system
+* Work plans
 
 ## QUESTIONS
 
-1. todo_add_question?
+* todo_add_question?
 
 ## MORNING
 
@@ -22,19 +22,19 @@
 
 #### ✅ What was done yesterday
 
-- **todo_done**
+* **todo_done**
 
 #### 🔄 What is planned for today
 
-- **todo_planned**
+* **todo_planned**
 
 #### ❗ blockers & escalations
 
-- **todo_add_blocker**
+* **todo_add_blocker**
 
 ## AFTERNOON
 
-1. todo_important_note
+* todo_important_note
 
 ## WRAP UP DAY
 
@@ -50,4 +50,4 @@
 
 ### Timesheet submission
 
-- NZ_Timesheet_Code todo_add_charging_code
+* NZ_Timesheet_Code todo_add_charging_code

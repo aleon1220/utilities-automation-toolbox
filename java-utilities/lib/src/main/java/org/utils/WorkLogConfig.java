@@ -1,17 +1,19 @@
 package org.utils;
 
 import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import picocli.CommandLine;
@@ -26,7 +28,10 @@ import picocli.CommandLine.Option;
         "    worklog -s 2026-03-01 -e 2026-03-31",
         "  Create logs for the current work week:",
         "    worklog --this-week",
-        "    worklog -t"
+        "    worklog -t",
+        "  Append content to a markdown file:",
+        "    worklog --append /path/to/file.md --content \"Completed ticket PROJ-123\"",
+        "    worklog -a /path/to/file.md -c \"Daily notes\""
 }, sortOptions = false, requiredOptionMarker = '*', showDefaultValues = true)
 
 public class WorkLogConfig implements Runnable {
@@ -41,6 +46,12 @@ public class WorkLogConfig implements Runnable {
 
     @Option(names = { "-d", "--dryrun" }, description = "safely execute and mock the execution")
     boolean dryrun;
+
+    @Option(names = { "-a", "--append" }, description = "Target markdown file path to append content to")
+    Optional<String> appendFile = Optional.empty();
+
+    @Option(names = { "-c", "--content" }, description = "Markdown content to append")
+    Optional<String> appendContent = Optional.empty();
 
     @Option(names = { "-h", "--help" }, usageHelp = true, description = "worklog Show this help message and exit")
     boolean help;
@@ -93,6 +104,9 @@ public class WorkLogConfig implements Runnable {
             }
 
             Path outputDir = resolveOutputDirectory();
+            System.out.println("======= 📂 Target output directory: " + outputDir);
+
+            List<Path> createdFiles = new ArrayList<>();
 
             for (LocalDate date = startDate; !date.isAfter(endDate.get()); date = date.plusDays(1)) {
 
@@ -117,8 +131,9 @@ public class WorkLogConfig implements Runnable {
                         System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n",
                                 fileName);
                     }
+                    createdFiles.add(filePath);
                     continue;
-                } // end of dryrun check // end of dryrun check
+                } // end of dryrun check
 
                 var template = loadResource("templates/worklog-day.md");
                 var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
@@ -126,34 +141,59 @@ public class WorkLogConfig implements Runnable {
                 Files.writeString(filePath, fullMarkdownContent);
 
                 if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                    System.out.printf("======= Friday includes extra Reflection section");
                     try (BufferedWriter writer = Files.newBufferedWriter(filePath,
                             java.nio.file.StandardOpenOption.APPEND)) {
-                        System.out.printf("======= Friday includes a Reflection section");
                         writer.write(textFridayTemplate);
                         System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
                     }
                 } // end of if block checking for Friday to add reflection template
 
                 System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
+                createdFiles.add(filePath);
             } // end of for loop iterating over dates
+
+            if (dryrun) {
+                System.out.printf("======= 📋 [DRY RUN] Summary: %d file(s) would be generated in %s%n",
+                        createdFiles.size(), outputDir);
+            } else {
+                System.out.printf("======= 📋 Summary: %d file(s) generated in %s%n",
+                        createdFiles.size(), outputDir);
+                for (Path file : createdFiles) {
+                    System.out.println("======= 📄 Generated file: " + file);
+                }
+            }
         } catch (IOException e) {
             System.err.println("Error creating markdown files: " + e.getMessage());
             e.printStackTrace();
         } // end of catch block
     } // end of createMarkdownFiles()
 
-    // todo: this method is an attempt to append content. Simplify and generalise
-    // todo: it can be exposed as functionality in the CLI
     public static void addContentToMarkdownFile(String overrideMarkdownFilePath, String xtraMarkdownContent) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFilePath, true))) {
+        if (overrideMarkdownFilePath == null || overrideMarkdownFilePath.isBlank()) {
+            System.err.println("======= Error: File path cannot be null or empty");
+            return;
+        }
+        addContentToMarkdownFile(Path.of(overrideMarkdownFilePath), xtraMarkdownContent);
+    }
+
+    public static void addContentToMarkdownFile(Path filePath, String xtraMarkdownContent) {
+        if (filePath == null) {
+            System.err.println("======= Error: File path cannot be null");
+            return;
+        }
+        try {
             var headerWorkLogDayFormatted = String.format("## %s appending %n", formatDateForFileName(LocalDate.now()));
-            System.out.println("======= ⏭️ markdown content to add: " + headerWorkLogDayFormatted + xtraMarkdownContent);
-            writer.write(headerWorkLogDayFormatted);
-            writer.write(xtraMarkdownContent);
-            writer.newLine();
-            System.out.println("======= 📝 markdown override added to file " + overrideMarkdownFilePath);
+            String contentToAppend = headerWorkLogDayFormatted + (xtraMarkdownContent != null ? xtraMarkdownContent : "") + System.lineSeparator();
+            System.out.println("======= ⏭️ markdown content to add: " + headerWorkLogDayFormatted + (xtraMarkdownContent != null ? xtraMarkdownContent : ""));
+
+            if (filePath.getParent() != null) {
+                Files.createDirectories(filePath.getParent());
+            }
+            Files.writeString(filePath, contentToAppend, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            System.out.println("======= 📝 markdown override added to file " + filePath);
         } catch (IOException e) {
+            System.err.println("======= Error appending to file " + filePath + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -214,9 +254,25 @@ public class WorkLogConfig implements Runnable {
         };
     }
 
-    // todo: understand this override
     @Override
     public void run() {
+        if (appendFile.isPresent() && appendContent.isPresent()) {
+            if (dryrun) {
+                System.out.println("🧪 ======= DRY RUN MODE ENABLED =======");
+                System.out.printf("======= 📝 [DRY RUN] Would append content to %s%n", appendFile.get());
+                System.out.printf("======= ⏭️ [DRY RUN] Content: %s%n", appendContent.get());
+                return;
+            }
+            addContentToMarkdownFile(appendFile.get(), appendContent.get());
+            return;
+        }
+
+        if (appendFile.isPresent() || appendContent.isPresent()) {
+            System.out.println("======= Error: Both --append (-a) and --content (-c) are required to append content.");
+            new CommandLine(this).usage(System.out);
+            return;
+        }
+
         if (thisWeek) {
             LocalDate now = LocalDate.now();
             startDate = Optional.of(now.with(DayOfWeek.MONDAY));
@@ -233,7 +289,6 @@ public class WorkLogConfig implements Runnable {
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new WorkLogConfig()).execute(args);
-        // todo: add logs that show the output directory and file names being
         System.exit(exitCode);
     }
 
@@ -249,6 +304,7 @@ public class WorkLogConfig implements Runnable {
 
         try {
             Files.createDirectories(dir);
+            System.out.println("======= 📁 Output directory: " + dir);
         } catch (IOException e) {
             throw new IllegalStateException("Unable to create output directory: " + dir, e);
         }
