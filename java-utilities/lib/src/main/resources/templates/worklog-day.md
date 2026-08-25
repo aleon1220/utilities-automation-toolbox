@@ -8,13 +8,13 @@
 
 ### Systems to leverage
 
-1. Boards Planning System [Trello](https://trello.com/c/63qYHZ9V)
-2. Client planning system
-3. Work plans
+* Boards Planning System [Trello](https://trello.com/c/63qYHZ9V)
+* Client planning system
+* Work plans
 
 ## QUESTIONS
 
-1. todo_add_question?
+* todo_add_question?
 
 ## MORNING
 
@@ -34,7 +34,7 @@
 
 ## AFTERNOON
 
-1. todo_important_note
+* todo_important_note
 
 ## WRAP UP DAY
 
