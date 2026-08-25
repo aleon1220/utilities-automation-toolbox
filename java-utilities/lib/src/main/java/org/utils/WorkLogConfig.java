@@ -12,6 +12,8 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import picocli.CommandLine;
@@ -102,6 +104,9 @@ public class WorkLogConfig implements Runnable {
             }
 
             Path outputDir = resolveOutputDirectory();
+            System.out.println("======= 📂 Target output directory: " + outputDir);
+
+            List<Path> createdFiles = new ArrayList<>();
 
             for (LocalDate date = startDate; !date.isAfter(endDate.get()); date = date.plusDays(1)) {
 
@@ -126,8 +131,9 @@ public class WorkLogConfig implements Runnable {
                         System.out.printf("======= 🛠️ [DRY RUN] Would add Friday Reflection block to file %s %n",
                                 fileName);
                     }
+                    createdFiles.add(filePath);
                     continue;
-                } // end of dryrun check // end of dryrun check
+                } // end of dryrun check
 
                 var template = loadResource("templates/worklog-day.md");
                 var fullMarkdownContent = template.replace("{{title_date}}", standardizedDateName);
@@ -135,17 +141,27 @@ public class WorkLogConfig implements Runnable {
                 Files.writeString(filePath, fullMarkdownContent);
 
                 if (date.getDayOfWeek() == DayOfWeek.FRIDAY) {
-                    System.out.printf("======= Friday includes extra Reflection section");
                     try (BufferedWriter writer = Files.newBufferedWriter(filePath,
                             java.nio.file.StandardOpenOption.APPEND)) {
-                        System.out.printf("======= Friday includes a Reflection section");
                         writer.write(textFridayTemplate);
                         System.out.printf("======= 🔀 Friday Reflection block added to file %s %n", fileName);
                     }
                 } // end of if block checking for Friday to add reflection template
 
                 System.out.printf("======= ✅ Created file %s at path %s %n", fileName, filePath);
+                createdFiles.add(filePath);
             } // end of for loop iterating over dates
+
+            if (dryrun) {
+                System.out.printf("======= 📋 [DRY RUN] Summary: %d file(s) would be generated in %s%n",
+                        createdFiles.size(), outputDir);
+            } else {
+                System.out.printf("======= 📋 Summary: %d file(s) generated in %s%n",
+                        createdFiles.size(), outputDir);
+                for (Path file : createdFiles) {
+                    System.out.println("======= 📄 Generated file: " + file);
+                }
+            }
         } catch (IOException e) {
             System.err.println("Error creating markdown files: " + e.getMessage());
             e.printStackTrace();
@@ -273,7 +289,6 @@ public class WorkLogConfig implements Runnable {
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new WorkLogConfig()).execute(args);
-        // todo: add logs that show the output directory and file names being
         System.exit(exitCode);
     }
 
@@ -289,6 +304,7 @@ public class WorkLogConfig implements Runnable {
 
         try {
             Files.createDirectories(dir);
+            System.out.println("======= 📁 Output directory: " + dir);
         } catch (IOException e) {
             throw new IllegalStateException("Unable to create output directory: " + dir, e);
         }

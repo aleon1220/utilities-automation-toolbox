@@ -145,6 +145,55 @@ class WorkLogConfigTest {
     }
 
     @Test
+    void testCreateMarkdownFilesLogsOutputDirectoryAndGeneratedFiles(@TempDir Path tempDir) {
+        WorkLogConfig config = new WorkLogConfig();
+        config.baseOutputDir = tempDir.toString();
+        config.startDate = Optional.of(LocalDate.of(2026, 3, 5)); // Thursday
+        config.endDate = Optional.of(LocalDate.of(2026, 3, 6)); // Friday
+
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        try {
+            System.setOut(new PrintStream(outputStream, true, StandardCharsets.UTF_8));
+            config.createMarkdownFiles();
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String output = outputStream.toString(StandardCharsets.UTF_8);
+
+        assertThat(output).contains("Output directory:");
+        assertThat(output).contains("Target output directory:");
+        assertThat(output).contains("Summary: 2 file(s) generated in");
+        assertThat(output).contains("Generated file:");
+        assertThat(output).contains("2026-03-05-Thursday.md");
+        assertThat(output).contains("2026-03-06-Friday.md");
+    }
+
+    @Test
+    void testCreateMarkdownFilesDryRunSummaryLog(@TempDir Path tempDir) {
+        WorkLogConfig config = new WorkLogConfig();
+        config.dryrun = true;
+        config.baseOutputDir = tempDir.toString();
+        config.startDate = Optional.of(LocalDate.of(2026, 3, 5)); // Thursday
+        config.endDate = Optional.of(LocalDate.of(2026, 3, 6)); // Friday
+
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        try {
+            System.setOut(new PrintStream(outputStream, true, StandardCharsets.UTF_8));
+            config.createMarkdownFiles();
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String output = outputStream.toString(StandardCharsets.UTF_8);
+        assertThat(output).contains("[DRY RUN] Summary: 2 file(s) would be generated in");
+    }
+
+    @Test
     void testCreateMarkdownFilesDryRunDoesNotDuplicateDates(@TempDir Path tempDir) {
         WorkLogConfig config = new WorkLogConfig();
         config.dryrun = true;
