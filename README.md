@@ -33,3 +33,4 @@ This repo operates as the orchestrator repo for other git repos.
 - Fixed `WorkLogConfig` tests by adding method overload for backward compatibility.
 - Implemented CLI footer examples for `--this-week` in `WorkLogConfig`.
 - Extracted holidays logic to a separate `Holidays` class for modularity.
+- Simplified and generalized `addContentToMarkdownFile` with CLI options (`-a`/`--append` and `-c`/`--content`).

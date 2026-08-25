@@ -20,25 +20,33 @@ uses the format **File Name Format yyyy-MM-dd-EEEE.md** Example: `2026-03-17-Tue
 
 The tool uses **Picocli** to accept command‑line arguments:
 
-| Option              | Description                                                                     |
-| ------------------- | ------------------------------------------------------------------------------- |
-| `--help`, `-h`      | Displays the help message  and some extra commands to facilitate execution      |
+| Option                 | Description                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `-s`, `--start`        | Start date `YYYY-MM-DD`                                                         |
+| `-e`, `--end`          | End date `YYYY-MM-DD`                                                           |
+| `-t`, `--this-week`    | Creates WorkLogs for this work week (Monday to Friday)                          |
+| `-d`, `--dryrun`       | Safely execute and mock the execution                                           |
+| `-o`, `--out`          | Base output directory (defaults to `/mnt/c/workspace/TESTS`)                   |
+| `-a`, `--append`       | Target markdown file path to append content to                                  |
+| `-c`, `--content`      | Markdown content to append                                                      |
+| `-h`, `--help`         | Displays the help message and execution examples                                |
 
 ***
 
-## **Markdown File Generation**
+## **Markdown File Generation & Content Appending**
 
-The utility generates 1 **markdown `.md` file per business day** within the given date range.
+The utility generates 1 **markdown `.md` file per business day** within the given date range, or appends notes to an existing markdown file.
 
 ### **Content Behavior**
 
 * Inserts a **title header** for the date.
 * Inserts the **daily worklog markdown template**.
-* When date falls on a **Friday**, the tool appends an additional sections
+* When date falls on a **Friday**, the tool appends additional sections:
   * **Reflection**
   * **Learning & Next Goals**
-* skips Weekends (Saturday & Sunday)
-* skips New Zealand Public Holidays (hardcoded for 2026)
+* Skips Weekends (Saturday & Sunday)
+* Skips New Zealand Public Holidays (hardcoded for 2026)
+* Supports **appending markdown content** with a timestamp header using `--append` (`-a`) and `--content` (`-c`) flags.
 
 ***
 

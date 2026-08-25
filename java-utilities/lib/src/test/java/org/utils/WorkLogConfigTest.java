@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
+import picocli.CommandLine;
 
 class WorkLogConfigTest {
 
@@ -193,6 +194,107 @@ class WorkLogConfigTest {
         assertThat(content).contains("Initial content");
         assertThat(content).contains("extra data");
         assertThat(content).contains("appending");
+    }
+
+    @Test
+    void testAddContentToMarkdownFileWithPath(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("test-path.md");
+        Files.writeString(file, "# Existing Header\n");
+
+        WorkLogConfig.addContentToMarkdownFile(file, "content added via Path");
+
+        String content = Files.readString(file);
+        assertThat(content).contains("# Existing Header");
+        assertThat(content).contains("content added via Path");
+        assertThat(content).contains("appending");
+    }
+
+    @Test
+    void testAddContentToMarkdownFileCreatesParentDirectory(@TempDir Path tempDir) throws IOException {
+        Path nestedFile = tempDir.resolve("nested").resolve("sub").resolve("new-file.md");
+
+        WorkLogConfig.addContentToMarkdownFile(nestedFile, "auto created dirs");
+
+        assertThat(Files.exists(nestedFile)).isTrue();
+        String content = Files.readString(nestedFile);
+        assertThat(content).contains("auto created dirs");
+    }
+
+    @Test
+    void testAddContentToMarkdownFileNullAndEmpty() {
+        assertDoesNotThrow(() -> WorkLogConfig.addContentToMarkdownFile((String) null, "content"));
+        assertDoesNotThrow(() -> WorkLogConfig.addContentToMarkdownFile("", "content"));
+        assertDoesNotThrow(() -> WorkLogConfig.addContentToMarkdownFile("   ", "content"));
+        assertDoesNotThrow(() -> WorkLogConfig.addContentToMarkdownFile((Path) null, "content"));
+    }
+
+    @Test
+    void testRunAppendMode(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("append-run.md");
+        Files.writeString(file, "Run initial\n");
+
+        WorkLogConfig config = new WorkLogConfig();
+        config.appendFile = Optional.of(file.toString());
+        config.appendContent = Optional.of("run append content");
+        config.run();
+
+        String content = Files.readString(file);
+        assertThat(content).contains("Run initial");
+        assertThat(content).contains("run append content");
+    }
+
+    @Test
+    void testRunAppendModeDryRun(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("append-dryrun.md");
+        Files.writeString(file, "Dry run initial\n");
+
+        WorkLogConfig config = new WorkLogConfig();
+        config.dryrun = true;
+        config.appendFile = Optional.of(file.toString());
+        config.appendContent = Optional.of("dry run content");
+
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try {
+            System.setOut(new PrintStream(outputStream, true, StandardCharsets.UTF_8));
+            config.run();
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String output = outputStream.toString(StandardCharsets.UTF_8);
+        assertThat(output).contains("[DRY RUN] Would append content to");
+        assertThat(output).contains("dry run content");
+
+        String fileContent = Files.readString(file);
+        assertThat(fileContent).isEqualTo("Dry run initial\n");
+    }
+
+    @Test
+    void testRunAppendMissingArgs() {
+        WorkLogConfig config = new WorkLogConfig();
+        config.appendFile = Optional.of("some/path.md");
+        // appendContent is empty
+        assertDoesNotThrow(() -> config.run());
+
+        WorkLogConfig config2 = new WorkLogConfig();
+        config2.appendContent = Optional.of("some content");
+        // appendFile is empty
+        assertDoesNotThrow(() -> config2.run());
+    }
+
+    @Test
+    void testCommandLineExecuteAppend(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("cli-append.md");
+        Files.writeString(file, "CLI initial\n");
+
+        int exitCode = new CommandLine(new WorkLogConfig())
+                .execute("-a", file.toString(), "-c", "CLI appended note");
+
+        assertThat(exitCode).isEqualTo(0);
+        String content = Files.readString(file);
+        assertThat(content).contains("CLI initial");
+        assertThat(content).contains("CLI appended note");
     }
 
     private static int countOccurrences(String text, String search) {

@@ -1,12 +1,12 @@
 package org.utils;
 
 import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -26,7 +26,10 @@ import picocli.CommandLine.Option;
         "    worklog -s 2026-03-01 -e 2026-03-31",
         "  Create logs for the current work week:",
         "    worklog --this-week",
-        "    worklog -t"
+        "    worklog -t",
+        "  Append content to a markdown file:",
+        "    worklog --append /path/to/file.md --content \"Completed ticket PROJ-123\"",
+        "    worklog -a /path/to/file.md -c \"Daily notes\""
 }, sortOptions = false, requiredOptionMarker = '*', showDefaultValues = true)
 
 public class WorkLogConfig implements Runnable {
@@ -41,6 +44,12 @@ public class WorkLogConfig implements Runnable {
 
     @Option(names = { "-d", "--dryrun" }, description = "safely execute and mock the execution")
     boolean dryrun;
+
+    @Option(names = { "-a", "--append" }, description = "Target markdown file path to append content to")
+    Optional<String> appendFile = Optional.empty();
+
+    @Option(names = { "-c", "--content" }, description = "Markdown content to append")
+    Optional<String> appendContent = Optional.empty();
 
     @Option(names = { "-h", "--help" }, usageHelp = true, description = "worklog Show this help message and exit")
     boolean help;
@@ -143,17 +152,32 @@ public class WorkLogConfig implements Runnable {
         } // end of catch block
     } // end of createMarkdownFiles()
 
-    // todo: this method is an attempt to append content. Simplify and generalise
-    // todo: it can be exposed as functionality in the CLI
     public static void addContentToMarkdownFile(String overrideMarkdownFilePath, String xtraMarkdownContent) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(overrideMarkdownFilePath, true))) {
+        if (overrideMarkdownFilePath == null || overrideMarkdownFilePath.isBlank()) {
+            System.err.println("======= Error: File path cannot be null or empty");
+            return;
+        }
+        addContentToMarkdownFile(Path.of(overrideMarkdownFilePath), xtraMarkdownContent);
+    }
+
+    public static void addContentToMarkdownFile(Path filePath, String xtraMarkdownContent) {
+        if (filePath == null) {
+            System.err.println("======= Error: File path cannot be null");
+            return;
+        }
+        try {
             var headerWorkLogDayFormatted = String.format("## %s appending %n", formatDateForFileName(LocalDate.now()));
-            System.out.println("======= ⏭️ markdown content to add: " + headerWorkLogDayFormatted + xtraMarkdownContent);
-            writer.write(headerWorkLogDayFormatted);
-            writer.write(xtraMarkdownContent);
-            writer.newLine();
-            System.out.println("======= 📝 markdown override added to file " + overrideMarkdownFilePath);
+            String contentToAppend = headerWorkLogDayFormatted + (xtraMarkdownContent != null ? xtraMarkdownContent : "") + System.lineSeparator();
+            System.out.println("======= ⏭️ markdown content to add: " + headerWorkLogDayFormatted + (xtraMarkdownContent != null ? xtraMarkdownContent : ""));
+
+            if (filePath.getParent() != null) {
+                Files.createDirectories(filePath.getParent());
+            }
+            Files.writeString(filePath, contentToAppend, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            System.out.println("======= 📝 markdown override added to file " + filePath);
         } catch (IOException e) {
+            System.err.println("======= Error appending to file " + filePath + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -214,9 +238,25 @@ public class WorkLogConfig implements Runnable {
         };
     }
 
-    // todo: understand this override
     @Override
     public void run() {
+        if (appendFile.isPresent() && appendContent.isPresent()) {
+            if (dryrun) {
+                System.out.println("🧪 ======= DRY RUN MODE ENABLED =======");
+                System.out.printf("======= 📝 [DRY RUN] Would append content to %s%n", appendFile.get());
+                System.out.printf("======= ⏭️ [DRY RUN] Content: %s%n", appendContent.get());
+                return;
+            }
+            addContentToMarkdownFile(appendFile.get(), appendContent.get());
+            return;
+        }
+
+        if (appendFile.isPresent() || appendContent.isPresent()) {
+            System.out.println("======= Error: Both --append (-a) and --content (-c) are required to append content.");
+            new CommandLine(this).usage(System.out);
+            return;
+        }
+
         if (thisWeek) {
             LocalDate now = LocalDate.now();
             startDate = Optional.of(now.with(DayOfWeek.MONDAY));
