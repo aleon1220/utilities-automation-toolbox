@@ -19,6 +19,7 @@ on:
 
 jobs:
   report-all-repos:
+    name: www.andres.nz Github Repos
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -35,3 +36,4 @@ jobs:
           repo_filter: ${{ inputs.repo_filter }}
           org_name: ${{ github.repository_owner }}
           gh_token: ${{ secrets.ORG_LEVEL_TOKEN }}
+          debug: ${{ inputs.debug }}
