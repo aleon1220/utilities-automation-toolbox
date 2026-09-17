@@ -317,8 +317,6 @@ runs:
                 log INFO "Phase 2: Repository ${REPO} has qualifying improvement branches"
               fi
 
-              echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}" >> "$BRANCHES_FILE"
-
               # Check if branch is from a previous month
               IS_PREV_MONTH=false
               if [[ "$BR" =~ ^([0-9]{4}-[0-9]{2})- ]]; then
@@ -337,6 +335,8 @@ runs:
                 log INFO "Phase 2: Improvement branch ${BR} in ${REPO} is from a previous month"
                 echo "${REPO}" >> "$PREV_MONTH_REPOS_FILE"
               fi
+
+              echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${IS_PREV_MONTH}" >> "$BRANCHES_FILE"
             done < <(printf "%s\n" "$IMPROVEMENT_BRANCHES" | sort -r)
           fi
         done < "$RUNNER_TEMP/repos_metadata.txt"
@@ -371,7 +371,7 @@ runs:
         CLEANUP_FILE="$RUNNER_TEMP/cleanup_candidates.txt"
         : > "$CLEANUP_FILE"
 
-        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR; do
+        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR IS_PREV_MONTH; do
           [ -z "$REPO" ] && continue
           BRANCHES_ANALYZED=$((BRANCHES_ANALYZED + 1))
           
@@ -429,7 +429,19 @@ runs:
           fi
 
           # 5. Interactive Automated Cleanup Dispatch Candidate
-          if [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ]; then
+          # Current-month improvement branches must NEVER be suggested for deletion.
+          # Only branches from previous months that are merged or have 0 commits ahead are eligible.
+          CURRENT_YM=$(date +%Y-%m)
+          CURRENT_MONTH_LOWER=$(LC_ALL=C date +%B | tr '[:upper:]' '[:lower:]')
+          IS_CURRENT_MONTH=false
+          if [[ "$BR" =~ ^([0-9]{4}-[0-9]{2})- ]]; then
+            [ "${BASH_REMATCH[1]}" = "$CURRENT_YM" ] && IS_CURRENT_MONTH=true
+          fi
+          if [[ "$BR" =~ ${CURRENT_MONTH_LOWER} ]]; then
+            IS_CURRENT_MONTH=true
+          fi
+
+          if [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ] && [ "$IS_CURRENT_MONTH" = false ] && [ "${IS_PREV_MONTH:-false}" = "true" ]; then
             if [ "${AHEAD_BY:-0}" -eq 0 ] || [ "$PR_STATE" = "MERGED" ]; then
               echo "${REPO}|${BR}|${AHEAD_BY}|${PR_STATE}" >> "$CLEANUP_FILE"
             fi
@@ -587,12 +599,14 @@ runs:
             echo "No repositories found with improvement branches from previous months."
           fi
 
+          echo ""
+          echo "## Recommended Next Steps"
+          echo ""
           if [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ]; then
-            echo ""
             echo "### Interactive Automated Cleanup Dispatch"
             echo ""
             if [ -s "$CLEANUP_FILE" ]; then
-              echo "The following branches have 0 commits ahead or are already merged and can safely be deleted:"
+              echo "The following improvement branches from **previous months** have 0 commits ahead or are already merged and can safely be deleted (current month branches are preserved):"
               echo ""
               while IFS='|' read -r C_REPO C_BR C_AHEAD C_STATE; do
                 [ -z "$C_REPO" ] && continue
@@ -604,8 +618,11 @@ runs:
                 echo "  \`\`\`"
               done < "$CLEANUP_FILE"
             else
-              echo "_No branches eligible for cleanup at this time._"
+              echo "_No stale improvement branches from previous months are eligible for cleanup at this time (current month branches are preserved)._"
             fi
+          else
+            echo "- Review qualifying improvement pull requests and merge completed cycles into \`main\`."
+            echo "- Run this workflow with \`cleanup_dispatch=true\` (or \`full_report=true\`) to generate cleanup commands for prior months' branches."
           fi
 
           echo ""
@@ -654,7 +671,11 @@ runs:
           echo ""
           echo "Current month: ${CURRENT_MONTH}"
           echo ""
-          echo "No repositories matched the selection."
+          echo ""
+          echo "## Recommended Next Steps"
+          echo ""
+          echo "- Verify the organization name (\`${ORG_NAME}\`) and repository permissions."
+          echo "- Ensure the GitHub token has required read scopes across organization repositories."
           echo ""
           echo "## Future Work"
           echo ""
