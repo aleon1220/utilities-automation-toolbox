@@ -6,7 +6,53 @@ permissions:
   pull-requests: read
 
 on:
+  # Manual runs from the Actions tab.
   workflow_dispatch:
+    inputs:
+      full_report:
+        description: "Full report (includes all options below)"
+        required: false
+        type: boolean
+        default: true
+      report_only_open_prs:
+        description: "Report only Open PRs"
+        required: false
+        type: boolean
+        default: false
+      stale_branch_age:
+        description: "Stale Branch Age Tracking"
+        required: false
+        type: boolean
+        default: false
+      pr_status:
+        description: "PR Status & Direct Links"
+        required: false
+        type: boolean
+        default: false
+      diff_links:
+        description: "Direct Diff & Comparison Deep-Links"
+        required: false
+        type: boolean
+        default: false
+      behind_main:
+        description: "Behind-Main & Conflict Risk Indicators"
+        required: false
+        type: boolean
+        default: false
+      cleanup_dispatch:
+        description: "Interactive Automated Cleanup Dispatch"
+        required: false
+        type: boolean
+        default: false
+      debug:
+        description: "Enable debug logging"
+        required: false
+        type: boolean
+        default: false
+
+  # Reusable: lets other workflows (e.g. "Create Monthly Improvement Branches")
+  # call this reporter as a job via `uses:` with `secrets: inherit`.
+  workflow_call:
     inputs:
       full_report:
         description: "Full report (includes all options below)"

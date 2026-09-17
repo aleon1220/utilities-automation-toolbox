@@ -291,8 +291,11 @@ gh run view $(gh run list --workflow="orchestrator-reporter.yml" --json=database
 # List all runs
 gh run list --workflow="orchestrator-prep-monthly-cycle.yml"
 
-# Trigger manually (scheduled, can be run anytime)
+# Trigger manually (only runs within the first 5 days of the month)
 gh workflow run orchestrator-prep-monthly-cycle.yml
+
+# Override the 5-day guard to run later in the month
+gh workflow run orchestrator-prep-monthly-cycle.yml -f force_run=true
 
 # Check last run logs
 gh run view $(gh run list --workflow="orchestrator-prep-monthly-cycle.yml" --json=databaseId --limit=1 --jq='.[0].databaseId') --log
