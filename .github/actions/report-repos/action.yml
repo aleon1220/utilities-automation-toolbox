@@ -15,6 +15,34 @@ inputs:
   gh_token:
     description: "GitHub token"
     required: true
+  full_report:
+    description: "Enable full report (all features)"
+    required: false
+    default: "true"
+  report_only_open_prs:
+    description: "Filter report to only open PRs"
+    required: false
+    default: "false"
+  stale_branch_age:
+    description: "Include stale branch age tracking"
+    required: false
+    default: "false"
+  pr_status:
+    description: "Include PR status & direct links"
+    required: false
+    default: "false"
+  diff_links:
+    description: "Include direct diff & comparison deep-links"
+    required: false
+    default: "false"
+  behind_main:
+    description: "Include behind-main & conflict risk indicators"
+    required: false
+    default: "false"
+  cleanup_dispatch:
+    description: "Include interactive automated cleanup dispatch"
+    required: false
+    default: "false"
   debug:
     description: "Enable extra diagnostics (verbose gh api call)"
     required: false
@@ -27,6 +55,9 @@ outputs:
   repos_with_improvements:
     description: "Number of repositories with improvement branches"
     value: ${{ steps.process.outputs.improvements_count || '0' }}
+  repos_with_prev_improvements:
+    description: "Number of repositories with improvement branches from previous months"
+    value: ${{ steps.process.outputs.prev_improvements_count || '0' }}
   status:
     description: "Processing status (success/failure/no_repos)"
     value: ${{ steps.process.outputs.status || steps.enumerate.outputs.status }}
@@ -90,6 +121,45 @@ runs:
         echo "BASH_ENV=$ENV_FILE" >> "$GITHUB_ENV"
         echo "Created a shared bash init file sourced automatically by all subsequent bash steps"
 
+    - name: Resolve reporting options
+      id: options
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        FULL_REPORT="${{ inputs.full_report }}"
+        ONLY_OPEN="${{ inputs.report_only_open_prs }}"
+
+        if [ "$FULL_REPORT" = "true" ]; then
+          OPT_STALE_AGE=true
+          OPT_PR_STATUS=true
+          OPT_DIFF_LINKS=true
+          OPT_BEHIND_MAIN=true
+          OPT_CLEANUP_DISPATCH=true
+        else
+          OPT_STALE_AGE="${{ inputs.stale_branch_age }}"
+          OPT_PR_STATUS="${{ inputs.pr_status }}"
+          OPT_DIFF_LINKS="${{ inputs.diff_links }}"
+          OPT_BEHIND_MAIN="${{ inputs.behind_main }}"
+          OPT_CLEANUP_DISPATCH="${{ inputs.cleanup_dispatch }}"
+        fi
+
+        log INFO "Resolved reporting options:"
+        log INFO "  full_report=$FULL_REPORT"
+        log INFO "  report_only_open_prs=$ONLY_OPEN"
+        log INFO "  stale_branch_age=$OPT_STALE_AGE"
+        log INFO "  pr_status=$OPT_PR_STATUS"
+        log INFO "  diff_links=$OPT_DIFF_LINKS"
+        log INFO "  behind_main=$OPT_BEHIND_MAIN"
+        log INFO "  cleanup_dispatch=$OPT_CLEANUP_DISPATCH"
+
+        echo "FULL_REPORT=$FULL_REPORT" >> "$GITHUB_ENV"
+        echo "OPT_ONLY_OPEN_PRS=$ONLY_OPEN" >> "$GITHUB_ENV"
+        echo "OPT_STALE_AGE=$OPT_STALE_AGE" >> "$GITHUB_ENV"
+        echo "OPT_PR_STATUS=$OPT_PR_STATUS" >> "$GITHUB_ENV"
+        echo "OPT_DIFF_LINKS=$OPT_DIFF_LINKS" >> "$GITHUB_ENV"
+        echo "OPT_BEHIND_MAIN=$OPT_BEHIND_MAIN" >> "$GITHUB_ENV"
+        echo "OPT_CLEANUP_DISPATCH=$OPT_CLEANUP_DISPATCH" >> "$GITHUB_ENV"
+
     - name: List repositories
       id: list
       env:
@@ -144,6 +214,7 @@ runs:
       shell: bash
       run: |
         echo "improvements_count=0" >> "$GITHUB_OUTPUT"
+        echo "prev_improvements_count=0" >> "$GITHUB_OUTPUT"
         echo "status=no_repos" >> "$GITHUB_OUTPUT"
         log INFO "Initialized metrics for empty selection (no_repos)"
 
@@ -205,6 +276,9 @@ runs:
         log INFO "Phase 2: Starting branch filtering"
         BRANCHES_FILE="$RUNNER_TEMP/improvement_branches.txt"
         : > "$BRANCHES_FILE"
+        PREV_MONTH_REPOS_FILE="$RUNNER_TEMP/prev_month_improvement_repos.txt"
+        : > "$PREV_MONTH_REPOS_FILE"
+        CURRENT_YM=$(date +%Y-%m)
 
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
           [ -z "$REPO" ] && continue
@@ -224,19 +298,59 @@ runs:
           if [ -z "$IMPROVEMENT_BRANCHES" ]; then
             log DEBUG "Phase 2: No improvement branches found in ${REPO} for pattern: ${BRANCH_PATTERN}"
           else
-            REPOS_WITH_IMPROVEMENTS=$((REPOS_WITH_IMPROVEMENTS + 1))
-            log INFO "Phase 2: Repository ${REPO} has improvement branches"
-            log DEBUG "Fixed Safe arithmetic addition"
-
+            REPO_HAS_IMPROVEMENTS=false
             while read -r BR; do
               [ -z "$BR" ] && continue
-              echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}" >> "$BRANCHES_FILE"
+
+              # If report_only_open_prs is active, skip branches without an open PR
+              if [ "${OPT_ONLY_OPEN_PRS:-false}" = "true" ]; then
+                OPEN_PR_NUM=$(gh pr list -R "${ORG_NAME}/${REPO}" -H "${BR}" --state open --limit 1 --json number --jq '.[0].number' 2>/dev/null || echo "")
+                if [ -z "$OPEN_PR_NUM" ]; then
+                  log DEBUG "Phase 2: Skipping ${BR} in ${REPO} (report_only_open_prs is active and no open PR exists)"
+                  continue
+                fi
+              fi
+
+              if [ "$REPO_HAS_IMPROVEMENTS" = false ]; then
+                REPOS_WITH_IMPROVEMENTS=$((REPOS_WITH_IMPROVEMENTS + 1))
+                REPO_HAS_IMPROVEMENTS=true
+                log INFO "Phase 2: Repository ${REPO} has qualifying improvement branches"
+              fi
+
+              # Check if branch is from a previous month
+              IS_PREV_MONTH=false
+              if [[ "$BR" =~ ^([0-9]{4}-[0-9]{2})- ]]; then
+                BRANCH_YM="${BASH_REMATCH[1]}"
+                if [[ "$BRANCH_YM" < "$CURRENT_YM" ]]; then
+                  IS_PREV_MONTH=true
+                fi
+              else
+                COMMIT_DATE=$(gh api "repos/${ORG_NAME}/${REPO}/branches/${BR}" --jq '.commit.commit.committer.date' 2>/dev/null || echo "")
+                if [ -n "$COMMIT_DATE" ] && [[ "${COMMIT_DATE:0:7}" < "$CURRENT_YM" ]]; then
+                  IS_PREV_MONTH=true
+                fi
+              fi
+
+              if [ "$IS_PREV_MONTH" = true ]; then
+                log INFO "Phase 2: Improvement branch ${BR} in ${REPO} is from a previous month"
+                echo "${REPO}" >> "$PREV_MONTH_REPOS_FILE"
+              fi
+
+              echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${IS_PREV_MONTH}" >> "$BRANCHES_FILE"
             done < <(printf "%s\n" "$IMPROVEMENT_BRANCHES" | sort -r)
           fi
         done < "$RUNNER_TEMP/repos_metadata.txt"
 
+        if [ -s "$PREV_MONTH_REPOS_FILE" ]; then
+          sort --unique --output="$PREV_MONTH_REPOS_FILE" "$PREV_MONTH_REPOS_FILE"
+          PREV_IMP_COUNT=$(sed '/^\s*$/d' "$PREV_MONTH_REPOS_FILE" | wc -l | tr -d ' ')
+        else
+          PREV_IMP_COUNT=0
+        fi
+
         echo "repos_with_improvements=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
-        log INFO "Phase 2 completed: ${REPOS_CHECKED} repos checked, ${REPOS_WITH_IMPROVEMENTS} with improvements"
+        echo "repos_with_prev_improvements=${PREV_IMP_COUNT}" >> "$GITHUB_OUTPUT"
+        log INFO "Phase 2 completed: ${REPOS_CHECKED} repos checked, ${REPOS_WITH_IMPROVEMENTS} with improvements, ${PREV_IMP_COUNT} with previous months improvements"
 
     - name: Process repos - Phase 3 - Analyze branch comparisons
       id: phase3_comparisons
@@ -252,8 +366,12 @@ runs:
         log INFO "Phase 3: Starting branch comparison analysis"
         COMPARISON_FILE="$RUNNER_TEMP/branch_comparisons.txt"
         : > "$COMPARISON_FILE"
+        DETAILS_FILE="$RUNNER_TEMP/branch_details.txt"
+        : > "$DETAILS_FILE"
+        CLEANUP_FILE="$RUNNER_TEMP/cleanup_candidates.txt"
+        : > "$CLEANUP_FILE"
 
-        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR; do
+        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR IS_PREV_MONTH; do
           [ -z "$REPO" ] && continue
           BRANCHES_ANALYZED=$((BRANCHES_ANALYZED + 1))
           
@@ -263,6 +381,73 @@ runs:
           
           log INFO "Phase 3: Branch comparison - repo=${REPO} base=${DEFAULT_BRANCH} branch=${BR} ahead=${AHEAD_BY} behind=${BEHIND_BY}"
           echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${AHEAD_BY}|${BEHIND_BY}" >> "$COMPARISON_FILE"
+
+          # 1. Stale Branch Age Tracking
+          AGE_TEXT=""
+          if [ "${OPT_STALE_AGE:-false}" = "true" ]; then
+            COMMIT_DATE=$(gh api "repos/${ORG_NAME}/${REPO}/branches/${BR}" --jq '.commit.commit.committer.date' 2>/dev/null || echo "")
+            if [ -n "$COMMIT_DATE" ]; then
+              COMMIT_TS=$(date -d "$COMMIT_DATE" +%s 2>/dev/null || echo "")
+              if [ -n "$COMMIT_TS" ]; then
+                NOW_TS=$(date +%s)
+                DAYS_OLD=$(( (NOW_TS - COMMIT_TS) / 86400 ))
+                AGE_TEXT="${DAYS_OLD}d ago"
+              fi
+            fi
+            [ -z "$AGE_TEXT" ] && AGE_TEXT="age unknown"
+          fi
+
+          # 2. PR Status & Direct Links
+          PR_TEXT=""
+          PR_STATE=""
+          if [ "${OPT_PR_STATUS:-false}" = "true" ] || [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ]; then
+            PR_JSON=$(gh pr list -R "${ORG_NAME}/${REPO}" -H "${BR}" --state all --limit 1 --json number,state,url --jq '.[0]' 2>/dev/null || echo "")
+            if [ -n "$PR_JSON" ] && [ "$PR_JSON" != "null" ]; then
+              PR_NUM=$(echo "$PR_JSON" | jq -r '.number // ""')
+              PR_STATE=$(echo "$PR_JSON" | jq -r '.state // ""')
+              PR_URL=$(echo "$PR_JSON" | jq -r '.url // ""')
+              PR_TEXT="PR [#${PR_NUM}](${PR_URL}) (${PR_STATE})"
+            else
+              PR_TEXT="No PR"
+            fi
+          fi
+
+          # 3. Direct Diff & Comparison Deep-Links
+          DIFF_TEXT=""
+          if [ "${OPT_DIFF_LINKS:-false}" = "true" ]; then
+            DIFF_TEXT="[Compare](https://github.com/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR})"
+          fi
+
+          # 4. Behind-Main & Conflict Risk Indicators
+          BEHIND_TEXT=""
+          if [ "${OPT_BEHIND_MAIN:-false}" = "true" ]; then
+            if [ "${BEHIND_BY:-0}" -gt 10 ]; then
+              BEHIND_TEXT="⚠️ Behind main by ${BEHIND_BY} (${AHEAD_BY} ahead)"
+            else
+              BEHIND_TEXT="${AHEAD_BY} ahead, ${BEHIND_BY} behind"
+            fi
+          fi
+
+          # 5. Interactive Automated Cleanup Dispatch Candidate
+          # Current-month improvement branches must NEVER be suggested for deletion.
+          # Only branches from previous months that are merged or have 0 commits ahead are eligible.
+          CURRENT_YM=$(date +%Y-%m)
+          CURRENT_MONTH_LOWER=$(LC_ALL=C date +%B | tr '[:upper:]' '[:lower:]')
+          IS_CURRENT_MONTH=false
+          if [[ "$BR" =~ ^([0-9]{4}-[0-9]{2})- ]]; then
+            [ "${BASH_REMATCH[1]}" = "$CURRENT_YM" ] && IS_CURRENT_MONTH=true
+          fi
+          if [[ "$BR" =~ ${CURRENT_MONTH_LOWER} ]]; then
+            IS_CURRENT_MONTH=true
+          fi
+
+          if [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ] && [ "$IS_CURRENT_MONTH" = false ] && [ "${IS_PREV_MONTH:-false}" = "true" ]; then
+            if [ "${AHEAD_BY:-0}" -eq 0 ] || [ "$PR_STATE" = "MERGED" ]; then
+              echo "${REPO}|${BR}|${AHEAD_BY}|${PR_STATE}" >> "$CLEANUP_FILE"
+            fi
+          fi
+
+          echo "${REPO}|${BR}|${AGE_TEXT}|${PR_TEXT}|${DIFF_TEXT}|${BEHIND_TEXT}" >> "$DETAILS_FILE"
         done < "$RUNNER_TEMP/improvement_branches.txt"
 
         echo "branches_analyzed=${BRANCHES_ANALYZED}" >> "$GITHUB_OUTPUT"
@@ -314,11 +499,13 @@ runs:
 
         REPOS_PROCESSED=${{ steps.phase1_metadata.outputs.repos_processed || '0' }}
         REPOS_WITH_IMPROVEMENTS=${{ steps.phase2_branches.outputs.repos_with_improvements || '0' }}
+        REPOS_WITH_PREV=${{ steps.phase2_branches.outputs.repos_with_prev_improvements || '0' }}
         BRANCHES_ANALYZED=${{ steps.phase3_comparisons.outputs.branches_analyzed || '0' }}
 
         log INFO "Phase 5: Preparing comprehensive summary"
         log INFO "Phase 5: Total repositories processed: ${REPOS_PROCESSED}"
         log INFO "Phase 5: Repositories with improvements: ${REPOS_WITH_IMPROVEMENTS}"
+        log INFO "Phase 5: Repositories with previous month improvements: ${REPOS_WITH_PREV}"
         log INFO "Phase 5: Branches analyzed: ${BRANCHES_ANALYZED}"
 
         if [ -f "$RUNNER_TEMP/branch_comparisons.txt" ]; then
@@ -333,33 +520,172 @@ runs:
 
         log INFO "Phase 5: Compiling final outputs"
         echo "improvements_count=${REPOS_WITH_IMPROVEMENTS}" >> "$GITHUB_OUTPUT"
+        echo "prev_improvements_count=${REPOS_WITH_PREV}" >> "$GITHUB_OUTPUT"
         echo "status=success" >> "$GITHUB_OUTPUT"
         log INFO "Phase 5 completed: Results aggregation finished"
         log INFO "Processing workflow completed successfully"
 
     - name: Summary with Github repos
       if: steps.enumerate.outputs.status == 'has_repos'
+      env:
+        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         COUNT="${{ steps.enumerate.outputs.count }}"
         IMP="${{ steps.process.outputs.improvements_count }}"
+        CURRENT_MONTH=$(LC_ALL=C date +"%B %Y")
+        PREV_REPOS_FILE="$RUNNER_TEMP/prev_month_improvement_repos.txt"
+        DETAILS_FILE="$RUNNER_TEMP/branch_details.txt"
+        CLEANUP_FILE="$RUNNER_TEMP/cleanup_candidates.txt"
+
+        ACTIVE_OPTIONS=()
+        [ "${FULL_REPORT:-false}" = "true" ] && ACTIVE_OPTIONS+=("Full report")
+        [ "${OPT_ONLY_OPEN_PRS:-false}" = "true" ] && ACTIVE_OPTIONS+=("Report only Open PRs")
+        [ "${OPT_STALE_AGE:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("Stale Branch Age Tracking")
+        [ "${OPT_PR_STATUS:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("PR Status & Direct Links")
+        [ "${OPT_DIFF_LINKS:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("Direct Diff & Comparison Deep-Links")
+        [ "${OPT_BEHIND_MAIN:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("Behind-Main & Conflict Risk Indicators")
+        [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("Interactive Automated Cleanup Dispatch")
+
+        OPTIONS_STR=""
+        if [ ${#ACTIVE_OPTIONS[@]} -eq 0 ]; then
+          OPTIONS_STR="Standard report"
+        else
+          OPTIONS_STR=$(IFS=', '; echo "${ACTIVE_OPTIONS[*]}")
+        fi
+
+        HAS_ENRICHED=false
+        if [ "${OPT_STALE_AGE:-false}" = "true" ] || [ "${OPT_PR_STATUS:-false}" = "true" ] || [ "${OPT_DIFF_LINKS:-false}" = "true" ] || [ "${OPT_BEHIND_MAIN:-false}" = "true" ]; then
+          HAS_ENRICHED=true
+        fi
+
         {
-          echo "### Report Repos Summary"
+          echo "### www.andres.nz Github Repos summary"
           echo ""
-          echo "- Org: ${{ inputs.org_name }}"
+          echo "- Org: ${ORG_NAME}"
           echo "- Selected repos: ${COUNT}"
           echo "- Repos with improvement branches: ${IMP}"
+          echo "- Reporting tweaks: ${OPTIONS_STR}"
+          echo ""
+          echo "### Repos with improvement branches from previous months"
+          echo ""
+          echo "Current month: ${CURRENT_MONTH}"
+          echo ""
+          if [ -s "$PREV_REPOS_FILE" ]; then
+            INDEX=1
+            while IFS= read -r REPO; do
+              [ -z "$REPO" ] && continue
+              echo "${INDEX}. [${REPO}](https://github.com/${ORG_NAME}/${REPO})"
+              INDEX=$((INDEX + 1))
+
+              if [ "$HAS_ENRICHED" = true ] && [ -f "$DETAILS_FILE" ]; then
+                while IFS='|' read -r D_REPO D_BR D_AGE D_PR D_DIFF D_BEHIND; do
+                  [ "$D_REPO" != "$REPO" ] && continue
+                  TAGS=()
+                  [ -n "$D_AGE" ] && TAGS+=("$D_AGE")
+                  [ -n "$D_PR" ] && TAGS+=("$D_PR")
+                  [ -n "$D_DIFF" ] && TAGS+=("$D_DIFF")
+                  [ -n "$D_BEHIND" ] && TAGS+=("$D_BEHIND")
+
+                  TAG_LINE=""
+                  if [ ${#TAGS[@]} -gt 0 ]; then
+                    TAG_LINE=" ("$(IFS=' | '; echo "${TAGS[*]}")")"
+                  fi
+                  echo "   - \`${D_BR}\`${TAG_LINE}"
+                done < "$DETAILS_FILE"
+              fi
+            done < "$PREV_REPOS_FILE"
+          else
+            echo "No repositories found with improvement branches from previous months."
+          fi
+
+          echo ""
+          echo "## Recommended Next Steps"
+          echo ""
+          if [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ]; then
+            echo "### Interactive Automated Cleanup Dispatch"
+            echo ""
+            if [ -s "$CLEANUP_FILE" ]; then
+              echo "The following improvement branches from **previous months** have 0 commits ahead or are already merged and can safely be deleted (current month branches are preserved):"
+              echo ""
+              while IFS='|' read -r C_REPO C_BR C_AHEAD C_STATE; do
+                [ -z "$C_REPO" ] && continue
+                REASON="0 ahead"
+                [ "$C_STATE" = "MERGED" ] && REASON="merged"
+                echo "- **${C_REPO}**: \`${C_BR}\` (${REASON})"
+                echo "  \`\`\`bash"
+                echo "  gh api --method DELETE repos/${ORG_NAME}/${C_REPO}/git/refs/heads/${C_BR}"
+                echo "  \`\`\`"
+              done < "$CLEANUP_FILE"
+            else
+              echo "_No stale improvement branches from previous months are eligible for cleanup at this time (current month branches are preserved)._"
+            fi
+          else
+            echo "- Review qualifying improvement pull requests and merge completed cycles into \`main\`."
+            echo "- Run this workflow with \`cleanup_dispatch=true\` (or \`full_report=true\`) to generate cleanup commands for prior months' branches."
+          fi
+
+          echo ""
+          echo "## Future Work"
+          echo ""
+          echo "1. **Stale Branch Age Tracking**: Calculate and display days elapsed since the last commit on each improvement branch to highlight abandoned branches."
+          echo "2. **Automated PR Status & Direct Links**: Check if an open PR exists for each improvement branch with direct links and status indicators."
+          echo "3. **Direct Diff & Comparison Deep-Links**: Include one-click GitHub comparison links (\`main...branch\`) for swift diff inspection."
+          echo "4. **Behind-Main & Conflict Risk Indicators**: Flag branches that are significantly behind the default branch (e.g. \`behind_by > 10\`) to preempt merge conflicts."
+          echo "5. **Multi-Channel Notifications**: Support sending the generated report via webhook to Slack, Microsoft Teams, or Discord."
+          echo "6. **Report Artifact Export (JSON/CSV)**: Export raw and aggregated metrics as downloadable workflow artifacts for historical tracking and trend analysis."
+          echo "7. **Interactive Automated Cleanup Dispatch**: Provide a workflow dispatch option to safely delete fully merged or obsolete improvement branches."
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Summary No repos
       if: steps.enumerate.outputs.status == 'no_repos'
+      env:
+        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
+        CURRENT_MONTH=$(LC_ALL=C date +"%B %Y")
+        ACTIVE_OPTIONS=()
+        [ "${FULL_REPORT:-false}" = "true" ] && ACTIVE_OPTIONS+=("Full report")
+        [ "${OPT_ONLY_OPEN_PRS:-false}" = "true" ] && ACTIVE_OPTIONS+=("Report only Open PRs")
+        [ "${OPT_STALE_AGE:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("Stale Branch Age Tracking")
+        [ "${OPT_PR_STATUS:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("PR Status & Direct Links")
+        [ "${OPT_DIFF_LINKS:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("Direct Diff & Comparison Deep-Links")
+        [ "${OPT_BEHIND_MAIN:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("Behind-Main & Conflict Risk Indicators")
+        [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ] && [ "${FULL_REPORT:-false}" != "true" ] && ACTIVE_OPTIONS+=("Interactive Automated Cleanup Dispatch")
+
+        OPTIONS_STR=""
+        if [ ${#ACTIVE_OPTIONS[@]} -eq 0 ]; then
+          OPTIONS_STR="Standard report"
+        else
+          OPTIONS_STR=$(IFS=', '; echo "${ACTIVE_OPTIONS[*]}")
+        fi
+
         {
-          echo "### Report Repos Summary"
+          echo "### www.andres.nz Github Repos summary"
           echo ""
-          echo "- Org: ${{ inputs.org_name }}"
+          echo "- Org: ${ORG_NAME}"
           echo "- No repositories matched the selection."
+          echo "- Reporting tweaks: ${OPTIONS_STR}"
+          echo ""
+          echo "### Repos with improvement branches from previous months"
+          echo ""
+          echo "Current month: ${CURRENT_MONTH}"
+          echo ""
+          echo ""
+          echo "## Recommended Next Steps"
+          echo ""
+          echo "- Verify the organization name (\`${ORG_NAME}\`) and repository permissions."
+          echo "- Ensure the GitHub token has required read scopes across organization repositories."
+          echo ""
+          echo "## Future Work"
+          echo ""
+          echo "1. **Stale Branch Age Tracking**: Calculate and display days elapsed since the last commit on each improvement branch to highlight abandoned branches."
+          echo "2. **Automated PR Status & Direct Links**: Check if an open PR exists for each improvement branch with direct links and status indicators."
+          echo "3. **Direct Diff & Comparison Deep-Links**: Include one-click GitHub comparison links (\`main...branch\`) for swift diff inspection."
+          echo "4. **Behind-Main & Conflict Risk Indicators**: Flag branches that are significantly behind the default branch (e.g. \`behind_by > 10\`) to preempt merge conflicts."
+          echo "5. **Multi-Channel Notifications**: Support sending the generated report via webhook to Slack, Microsoft Teams, or Discord."
+          echo "6. **Report Artifact Export (JSON/CSV)**: Export raw and aggregated metrics as downloadable workflow artifacts for historical tracking and trend analysis."
+          echo "7. **Interactive Automated Cleanup Dispatch**: Provide a workflow dispatch option to safely delete fully merged or obsolete improvement branches."
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Diagnostics (optional, read-only)

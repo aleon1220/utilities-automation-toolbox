@@ -6,19 +6,98 @@ permissions:
   pull-requests: read
 
 on:
+  # Manual runs from the Actions tab.
   workflow_dispatch:
     inputs:
-      repo_filter:
-        description: "Optional substring to filter repositories (case-insensitive)"
+      full_report:
+        description: "Full report (includes all options below)"
         required: false
-        type: string
+        type: boolean
+        default: true
+      report_only_open_prs:
+        description: "Report only Open PRs"
+        required: false
+        type: boolean
+        default: false
+      stale_branch_age:
+        description: "Stale Branch Age Tracking"
+        required: false
+        type: boolean
+        default: false
+      pr_status:
+        description: "PR Status & Direct Links"
+        required: false
+        type: boolean
+        default: false
+      diff_links:
+        description: "Direct Diff & Comparison Deep-Links"
+        required: false
+        type: boolean
+        default: false
+      behind_main:
+        description: "Behind-Main & Conflict Risk Indicators"
+        required: false
+        type: boolean
+        default: false
+      cleanup_dispatch:
+        description: "Interactive Automated Cleanup Dispatch"
+        required: false
+        type: boolean
+        default: false
       debug:
         description: "Enable debug logging"
         required: false
         type: boolean
+        default: false
+
+  # Reusable: lets other workflows (e.g. "Create Monthly Improvement Branches")
+  # call this reporter as a job via `uses:` with `secrets: inherit`.
+  workflow_call:
+    inputs:
+      full_report:
+        description: "Full report (includes all options below)"
+        required: false
+        type: boolean
+        default: true
+      report_only_open_prs:
+        description: "Report only Open PRs"
+        required: false
+        type: boolean
+        default: false
+      stale_branch_age:
+        description: "Stale Branch Age Tracking"
+        required: false
+        type: boolean
+        default: false
+      pr_status:
+        description: "PR Status & Direct Links"
+        required: false
+        type: boolean
+        default: false
+      diff_links:
+        description: "Direct Diff & Comparison Deep-Links"
+        required: false
+        type: boolean
+        default: false
+      behind_main:
+        description: "Behind-Main & Conflict Risk Indicators"
+        required: false
+        type: boolean
+        default: false
+      cleanup_dispatch:
+        description: "Interactive Automated Cleanup Dispatch"
+        required: false
+        type: boolean
+        default: false
+      debug:
+        description: "Enable debug logging"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   report-all-repos:
+    name: www.andres.nz Github Repos
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -32,6 +111,13 @@ jobs:
       - name: Report Repos
         uses: ./.github/actions/report-repos
         with:
-          repo_filter: ${{ inputs.repo_filter }}
           org_name: ${{ github.repository_owner }}
           gh_token: ${{ secrets.ORG_LEVEL_TOKEN }}
+          full_report: ${{ inputs.full_report }}
+          report_only_open_prs: ${{ inputs.report_only_open_prs }}
+          stale_branch_age: ${{ inputs.stale_branch_age }}
+          pr_status: ${{ inputs.pr_status }}
+          diff_links: ${{ inputs.diff_links }}
+          behind_main: ${{ inputs.behind_main }}
+          cleanup_dispatch: ${{ inputs.cleanup_dispatch }}
+          debug: ${{ inputs.debug }}
