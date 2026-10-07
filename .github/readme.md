@@ -89,16 +89,69 @@ and how many public and private repos it can see in the target, and warns about 
 
 ## Future Work
 
-Roadmap for the Repos Reporter. Checked items are done and can be turned on with
-the input shown.
+Roadmap for the Repos Reporter. ✅ items are done and can be turned on with the input
+shown. ⬜ items are planned.
 
-- [x] **Stale Branch Age Tracking** (`stale_branch_age`): Show time since the last commit on each improvement branch to highlight abandoned branches.
-- [x] **Automated PR Status & Direct Links** (`pr_status`): Check if an open PR exists for each improvement branch, with direct links and status indicators.
-- [x] **Direct Diff & Comparison Deep-Links** (`diff_links`): Include one-click GitHub comparison links (`main...branch`) for quick diff inspection.
-- [x] **Behind-Main & Conflict Risk Indicators** (`behind_main`, `behind_threshold`): Flag branches that are significantly behind the default branch (`behind_by > 10` by default) to preempt merge conflicts.
-- [x] **Interactive Automated Cleanup Dispatch** (`cleanup_dispatch`): List merged or obsolete improvement branches from previous months with delete commands.
-- [x] **Report Artifact Export (JSON/CSV)** (always on): Export raw and aggregated metrics as downloadable workflow artifacts for historical tracking and trend analysis.
-- [x] **Main Branch Trend Across Repos** (always on): Chart monthly commits to every repo's default branch, with per-repo activity and trend.
-- [ ] **Multi-Channel Notifications**: Send the generated report via webhook to Slack, Microsoft Teams or Discord.
-- [ ] **Multi-Owner Reports**: Report on a personal account and several orgs in a single run.
-- [ ] **Cross-Run History**: Read previous runs' `summary.json` artifacts to chart improvement-branch and conflict-risk trends over time.
+### Done
+
+- ✅ **Stale Branch Age Tracking** (`stale_branch_age`): Show time since the last commit on each improvement branch to highlight abandoned branches.
+- ✅ **Automated PR Status & Direct Links** (`pr_status`): Check if an open PR exists for each improvement branch, with direct links and status indicators.
+- ✅ **Direct Diff & Comparison Deep-Links** (`diff_links`): Include one-click GitHub comparison links (`main...branch`) for quick diff inspection.
+- ✅ **Behind-Main & Conflict Risk Indicators** (`behind_main`, `behind_threshold`): Flag branches that are significantly behind the default branch (`behind_by > 10` by default) to preempt merge conflicts.
+- ✅ **Interactive Automated Cleanup Dispatch** (`cleanup_dispatch`): List merged or obsolete improvement branches from previous months with delete commands.
+- ✅ **Report Artifact Export (JSON/CSV)** (always on): Export raw and aggregated metrics as downloadable workflow artifacts for historical tracking and trend analysis.
+- ✅ **Main Branch Trend Across Repos** (always on): Chart monthly commits to every repo's default branch, with per-repo activity and trend.
+
+### Planned
+
+- ⬜ **Multi-Owner Reports**: Report on a personal account and several orgs in a single run.
+- ⬜ **Cross-Run History**: Read previous runs' `summary.json` artifacts to chart improvement-branch and conflict-risk trends over time.
+- ⬜ **Faster Data Collection with Batched GraphQL**: Fetch branches, comparisons, PRs and last commits in a few batched GraphQL queries instead of several REST calls per branch (the compare endpoint is currently called twice per branch), to cut run time and API rate-limit use.
+- ⬜ **Reporter Test Suite in CI**: Run the report steps against fixture data with a stubbed `gh`, check the generated summary, CSV and JSON, and validate the Mermaid diagrams on every PR that touches `.github/`.
+- ⬜ **One-Click Cleanup & Sync Workflow**: A dispatchable workflow that reads the cleanup and sync candidates from the report artifact and deletes or syncs those branches, with a dry run by default, instead of copying commands by hand.
+- ⬜ **Dormant Repo Archive Suggestions**: List repos with no commits on the default branch for over a year, with a ready-to-run `gh repo archive` command, to keep the active set focused. Most repos are dormant today.
+- ⬜ **Default Branch Protection & Repo Hygiene Audit**: Flag repos whose default branch isn't protected or doesn't require PRs, and repos missing a description, README, license or Dependabot.
+- ⬜ **CI Health on Default Branches**: Show the latest workflow run result on each repo's default branch (✅ passing, ❌ failing or none) next to its activity.
+- ⬜ **Improvement Cycle Metrics**: For each monthly cycle, track how many improvement branches got commits, how many were merged, and the median days from branch creation to merge.
+
+### Experiment: GitHub automation with a typed SDK (.NET first, then Java)
+
+Port part of the reporter to a typed SDK, so GitHub data is handled as objects
+(repositories, branches, pull requests, workflow runs) instead of `gh api` text output.
+GitHub publishes official SDKs for .NET but not for Java, so .NET comes first. Options at
+the time of writing (October 2026):
+
+#### .NET (official GitHub SDKs)
+
+| Option | What it gives you |
+| --- | --- |
+| [Octokit.NET](https://github.com/octokit/octokit.net) ([`Octokit`](https://www.nuget.org/packages/Octokit) on NuGet) | GitHub's official, hand-written .NET client and the most mature choice: a typed, async REST client for repos, branches, PRs, workflow runs and GitHub App auth. Latest release v14.0.0 (January 2025); the repo still receives commits |
+| [Octokit.GraphQL](https://github.com/octokit/octokit.graphql.net) ([`Octokit.GraphQL`](https://www.nuget.org/packages/Octokit.GraphQL) on NuGet) | GitHub's official GraphQL client for .NET: strongly typed, LINQ-style queries, a good fit for the reporter's GraphQL calls. Still in beta (v0.4.0-beta, April 2024) |
+| [GitHub .NET SDK](https://github.com/octokit/dotnet-sdk) ([`GitHub.Octokit.SDK`](https://www.nuget.org/packages/GitHub.Octokit.SDK) on NuGet) | GitHub's official SDK generated with Kiota from the REST API's OpenAPI description, so it covers every endpoint. Pre-1.0 (v0.0.31, December 2024) with no commits since March 2025, so treat it as paused |
+| [.NET 10 file-based apps](https://devblogs.microsoft.com/dotnet/announcing-dotnet-run-app/) | Run a single `.cs` file with `dotnet run report.cs` and pull in packages with `#:package Octokit@<version>`, with no project file. A lightweight way to use the SDKs from a workflow step |
+| [Actions toolkit for C#](https://github.com/IEvangelist/actions-toolkit-csharp) ([`GitHub.Actions.Core`](https://www.nuget.org/packages/GitHub.Actions.Core) on NuGet) | Community port of GitHub's actions toolkit, for writing the action itself in C#: typed inputs, outputs, step summary and logging. Not an official GitHub or Microsoft product. Latest release 10.0 (December 2025), and its package IDs are moving to `ActionsTool` |
+
+Official references:
+
+- [GitHub Docs: Libraries for the REST API](https://docs.github.com/en/rest/using-the-rest-api/libraries-for-the-rest-api), which lists Octokit.NET as an official library
+- [GitHub blog: Our move to generated SDKs](https://github.blog/news-insights/product-news/our-move-to-generated-sdks/), which introduced the Kiota-based .NET and Go SDKs
+- [GitHub blog: Bringing GraphQL to Octokit.NET](https://github.blog/news-insights/the-library/graphql-for-octokit/)
+- [Microsoft Learn: Tutorial: Create a GitHub Action with .NET](https://learn.microsoft.com/dotnet/devops/create-dotnet-github-action)
+
+#### Java (community libraries)
+
+| Option | What it gives you |
+| --- | --- |
+| [Quarkus GitHub Action](https://docs.quarkiverse.io/quarkus-github-action/dev/index.html) (`io.quarkiverse.githubaction:quarkus-github-action`, 2.x) | Write the action itself in Java. An `@Action` method gets injected GitHub REST and GraphQL clients, the run context, typed inputs, and commands for outputs and the step summary. It can also build a native executable |
+| [GitHub API for Java](https://github.com/hub4j/github-api) (`org.kohsuke:github-api`) | Mature object model for the REST API: repos, branches, PRs, workflow runs and GitHub App auth. Stable 1.x line, with 2.0 in release candidates. Quarkus GitHub Action builds on it |
+| Kiota-generated client | [Kiota](https://github.com/microsoft/kiota) can generate a Java client from GitHub's [OpenAPI description](https://github.com/github/rest-api-description). It covers every endpoint but is lower level |
+
+Avoid `spotify/github-java-client`: its maintainers stopped support at the end of January 2026.
+
+#### Suggested first step
+
+Write a .NET 10 file-based app that uses Octokit.NET (plus Octokit.GraphQL for the monthly
+commit counts) to rebuild `main_branches.json`. Run it in a workflow step after
+`actions/setup-dotnet`, then compare its output with the reporter's artifact. For a Java
+version, a picocli command in [java-utilities](../java-utilities/) using GitHub API for
+Java fits the existing Java 25 build and CI.
