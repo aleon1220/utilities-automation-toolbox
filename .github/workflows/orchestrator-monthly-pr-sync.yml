@@ -1,4 +1,4 @@
-name: Monthly Branch Improvement Sync
+name: github-orchestrate Monthly Branch Sync
 permissions:
   contents: read
   pull-requests: write

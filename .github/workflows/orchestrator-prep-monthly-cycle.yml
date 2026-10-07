@@ -26,7 +26,7 @@
 #          disabled below.
 # =============================================================================
 
-name: Create Monthly Improvement Branches
+name: github-orchestrate Create Monthly Improvement Branches
 run-name: Create monthly improvement branches${{ inputs.force_run && ' (forced run)' || '' }}
 
 permissions:
