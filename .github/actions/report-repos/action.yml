@@ -391,10 +391,37 @@ runs:
               if [ -n "$COMMIT_TS" ]; then
                 NOW_TS=$(date +%s)
                 DAYS_OLD=$(( (NOW_TS - COMMIT_TS) / 86400 ))
-                AGE_TEXT="${DAYS_OLD}d ago"
+
+                # Human-friendly relative time
+                if [ "$DAYS_OLD" -lt 1 ]; then
+                  AGO="today"
+                elif [ "$DAYS_OLD" -eq 1 ]; then
+                  AGO="yesterday"
+                elif [ "$DAYS_OLD" -lt 14 ]; then
+                  AGO="${DAYS_OLD} days ago"
+                elif [ "$DAYS_OLD" -lt 60 ]; then
+                  AGO="$((DAYS_OLD / 7)) weeks ago"
+                elif [ "$DAYS_OLD" -lt 365 ]; then
+                  AGO="$((DAYS_OLD / 30)) months ago"
+                elif [ "$DAYS_OLD" -lt 730 ]; then
+                  AGO="1 year ago"
+                else
+                  AGO="$((DAYS_OLD / 365)) years ago"
+                fi
+
+                # Staleness status (one monthly cycle = abandoned)
+                if [ "$DAYS_OLD" -lt 14 ]; then
+                  STATUS="🟢 Active"
+                elif [ "$DAYS_OLD" -le 30 ]; then
+                  STATUS="🟡 Stale"
+                else
+                  STATUS="🔴 Abandoned"
+                fi
+
+                AGE_TEXT="${STATUS}, last commit ${AGO} (${COMMIT_DATE:0:10})"
               fi
             fi
-            [ -z "$AGE_TEXT" ] && AGE_TEXT="age unknown"
+            [ -z "$AGE_TEXT" ] && AGE_TEXT="⚪ Last commit date unknown"
           fi
 
           # 2. PR Status & Direct Links
@@ -571,6 +598,10 @@ runs:
           echo ""
           echo "Current month: ${CURRENT_MONTH}"
           echo ""
+          if [ "${OPT_STALE_AGE:-false}" = "true" ]; then
+            echo "Branch age legend (time since last commit): 🟢 Active: under 14 days · 🟡 Stale: 14–30 days · 🔴 Abandoned: over 30 days"
+            echo ""
+          fi
           if [ -s "$PREV_REPOS_FILE" ]; then
             INDEX=1
             while IFS= read -r REPO; do
@@ -589,7 +620,8 @@ runs:
 
                   TAG_LINE=""
                   if [ ${#TAGS[@]} -gt 0 ]; then
-                    TAG_LINE=" ("$(IFS=' | '; echo "${TAGS[*]}")")"
+                    JOINED=$(printf ' | %s' "${TAGS[@]}")
+                    TAG_LINE=" (${JOINED:3})"
                   fi
                   echo "   - \`${D_BR}\`${TAG_LINE}"
                 done < "$DETAILS_FILE"
@@ -626,15 +658,7 @@ runs:
           fi
 
           echo ""
-          echo "## Future Work"
-          echo ""
-          echo "1. **Stale Branch Age Tracking**: Calculate and display days elapsed since the last commit on each improvement branch to highlight abandoned branches."
-          echo "2. **Automated PR Status & Direct Links**: Check if an open PR exists for each improvement branch with direct links and status indicators."
-          echo "3. **Direct Diff & Comparison Deep-Links**: Include one-click GitHub comparison links (\`main...branch\`) for swift diff inspection."
-          echo "4. **Behind-Main & Conflict Risk Indicators**: Flag branches that are significantly behind the default branch (e.g. \`behind_by > 10\`) to preempt merge conflicts."
-          echo "5. **Multi-Channel Notifications**: Support sending the generated report via webhook to Slack, Microsoft Teams, or Discord."
-          echo "6. **Report Artifact Export (JSON/CSV)**: Export raw and aggregated metrics as downloadable workflow artifacts for historical tracking and trend analysis."
-          echo "7. **Interactive Automated Cleanup Dispatch**: Provide a workflow dispatch option to safely delete fully merged or obsolete improvement branches."
+          echo "_Report options and roadmap: [.github/readme.md](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/.github/readme.md#future-work)_"
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Summary No repos
@@ -677,15 +701,7 @@ runs:
           echo "- Verify the organization name (\`${ORG_NAME}\`) and repository permissions."
           echo "- Ensure the GitHub token has required read scopes across organization repositories."
           echo ""
-          echo "## Future Work"
-          echo ""
-          echo "1. **Stale Branch Age Tracking**: Calculate and display days elapsed since the last commit on each improvement branch to highlight abandoned branches."
-          echo "2. **Automated PR Status & Direct Links**: Check if an open PR exists for each improvement branch with direct links and status indicators."
-          echo "3. **Direct Diff & Comparison Deep-Links**: Include one-click GitHub comparison links (\`main...branch\`) for swift diff inspection."
-          echo "4. **Behind-Main & Conflict Risk Indicators**: Flag branches that are significantly behind the default branch (e.g. \`behind_by > 10\`) to preempt merge conflicts."
-          echo "5. **Multi-Channel Notifications**: Support sending the generated report via webhook to Slack, Microsoft Teams, or Discord."
-          echo "6. **Report Artifact Export (JSON/CSV)**: Export raw and aggregated metrics as downloadable workflow artifacts for historical tracking and trend analysis."
-          echo "7. **Interactive Automated Cleanup Dispatch**: Provide a workflow dispatch option to safely delete fully merged or obsolete improvement branches."
+          echo "_Report options and roadmap: [.github/readme.md](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/.github/readme.md#future-work)_"
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Diagnostics (optional, read-only)
