@@ -1,10 +1,14 @@
 name: Validate GitHub Token
-description: Validates GitHub CLI authentication and token permissions
+description: Validates GitHub CLI authentication and the token's access to the target user or org
 
 inputs:
   gh_token:
     description: GitHub token for authentication
     required: true
+  owner:
+    description: User or org the token must be able to read (defaults to this repo's owner)
+    required: false
+    default: ""
 
 outputs:
   authenticated:
@@ -50,29 +54,16 @@ runs:
 
         echo "::notice::✓ GitHub CLI authentication successful"
         echo "authenticated=true" >> $GITHUB_OUTPUT
-        echo "::notice::✓ Extracted key information and set GITHUB_OUTPUT"
-        echo "::endgroup::"
 
-        # Extract token owner
-        TOKEN_OWNER=$(gh auth status --show-token 2>/dev/null | grep "Logged in to" | awk '{print $4}' || echo "unknown")
+        TOKEN_OWNER=$(gh api user --jq '.login' 2>/dev/null || echo "unknown")
         echo "token_owner=$TOKEN_OWNER" >> $GITHUB_OUTPUT
-        echo "authenticated=true" >> $GITHUB_OUTPUT
 
-        # Get token scopes
-        TOKEN_SCOPES=$(gh api user --jq '.login' 2>/dev/null)
-        
-        if "$TOKEN_SCOPES"; then
-          TOKEN_SCOPES_MSG="Token has repository access"
-        else
-          TOKEN_SCOPES_MSG="Limited token scope"
-        fi
-        
-        echo "token_scopes=$TOKEN_SCOPES_MSG" >> $GITHUB_OUTPUT
-        echo "::notice::✓ Completed obtaining token_scopes to GITHUB_OUTPUT"
-        echo "::endgroup::"
+        # Classic PATs and OAuth tokens list their scopes in this header; fine-grained and app tokens don't
+        TOKEN_SCOPES=$(gh api -i user 2>/dev/null | tr -d '\r' | sed -n 's/^[Xx]-[Oo][Aa]uth-[Ss]copes: *//p')
+        echo "token_scopes=${TOKEN_SCOPES:-not listed (fine-grained or GitHub App token)}" >> $GITHUB_OUTPUT
 
-        echo "::group::Debug output TOKEN_SCOPES"
-        echo "$TOKEN_SCOPES"
+        echo "Token user:   ${TOKEN_OWNER}"
+        echo "Token scopes: ${TOKEN_SCOPES:-not listed (fine-grained or GitHub App token)}"
         echo "::endgroup::"
 
     - name: Validate Token Permissions
@@ -80,52 +71,64 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
+        OWNER: ${{ inputs.owner || github.repository_owner }}
+        THIS_REPO: ${{ github.repository }}
+        TOKEN_OWNER: ${{ steps.validate.outputs.token_owner }}
+        TOKEN_SCOPES: ${{ steps.validate.outputs.token_scopes }}
       run: |
-        set -e
-        
-        echo "::group::Validating Token Permissions"
-        
-        REQUIRED_SCOPES=("repo" "read:org" "workflow")
-        MISSING_SCOPES=()
-        
-        # Get token info to check scopes
-        TOKEN_INFO=$(gh auth status --show-token 2>&1 || true)
-        
-        echo "Token capabilities:"
-        
-        # Check for repo scope
-        if ! gh api repos/${{ github.repository_owner }} --silent 2>/dev/null; then
-          MISSING_SCOPES+=("repo")
-          echo "::warning::Missing 'repo' scope - cannot access repositories"
+        set -uo pipefail
+
+        echo "::group::Validating token access to ${OWNER}"
+        PROBLEMS=()
+
+        OWNER_TYPE=$(gh api "users/${OWNER}" --jq '.type' 2>/dev/null || echo "")
+        echo "Target: ${OWNER} (${OWNER_TYPE:-not found})"
+        if [ -z "$OWNER_TYPE" ]; then
+          PROBLEMS+=("'${OWNER}' was not found or is not visible to ${TOKEN_OWNER}")
+        fi
+
+        # Classic tokens: check the scopes the reporter needs. Orgs also need read:org.
+        if [[ "$TOKEN_SCOPES" != not\ listed* ]]; then
+          REQUIRED_SCOPES=("repo" "workflow")
+          [ "$OWNER_TYPE" = "Organization" ] && REQUIRED_SCOPES+=("read:org")
+          for SCOPE in "${REQUIRED_SCOPES[@]}"; do
+            if [[ ", ${TOKEN_SCOPES}, " != *", ${SCOPE}, "* ]] && \
+               ! { [ "$SCOPE" = "read:org" ] && [[ ", ${TOKEN_SCOPES}, " == *", admin:org, "* ]]; }; then
+              PROBLEMS+=("token is missing the '${SCOPE}' scope")
+            fi
+          done
+        fi
+
+        # Orgs: private repos are only visible to members
+        if [ "$OWNER_TYPE" = "Organization" ]; then
+          STATE=$(gh api "user/memberships/orgs/${OWNER}" --jq '.state' 2>/dev/null || echo "")
+          if [ "$STATE" = "active" ]; then
+            echo "Org membership: ${TOKEN_OWNER} is an active member of ${OWNER}"
+          else
+            PROBLEMS+=("${TOKEN_OWNER} is not an active member of org '${OWNER}' (or the token can't read memberships), so only public repos are visible")
+          fi
+        fi
+
+        # What the token can actually see
+        VISIBLE=$(gh repo list "$OWNER" --limit 1000 --no-archived --json visibility \
+          --jq 'group_by(.visibility) | map("\(length) \(.[0].visibility | ascii_downcase)") | join(", ")' 2>/dev/null || echo "")
+        echo "Visible non-archived repos in ${OWNER}: ${VISIBLE:-none}"
+        if [ -z "$VISIBLE" ]; then
+          PROBLEMS+=("no repositories in '${OWNER}' are visible to the token")
+        fi
+
+        if ! gh api "repos/${THIS_REPO}/actions/runs?per_page=1" --silent 2>/dev/null; then
+          PROBLEMS+=("token can't read workflow runs in ${THIS_REPO}")
+        fi
+        echo "::endgroup::"
+
+        if [ ${#PROBLEMS[@]} -gt 0 ]; then
+          for P in "${PROBLEMS[@]}"; do
+            echo "::warning::Token check: ${P}"
+          done
+          echo "::warning::See .github/readme.md (Token and access) for how to fix token access"
+          echo "permissions_valid=false" >> $GITHUB_OUTPUT
         else
-          echo "::debug::✓ Has 'repo' scope"
+          echo "::notice::✓ Token for ${TOKEN_OWNER} can read ${OWNER} (${VISIBLE})"
+          echo "permissions_valid=true" >> $GITHUB_OUTPUT
         fi
-        
-        if ! gh api orgs/${{ github.repository_owner }} --silent 2>/dev/null; then
-          MISSING_SCOPES+=("read:org")
-          echo "::warning::Missing 'read:org' scope - cannot read organization"
-        else
-          echo "::debug::✓ Has 'read:org' scope"
-        fi
-        echo "::notice::✓ Checked for org read scope"
-        
-        if ! gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/runs --silent 2>/dev/null; then
-          MISSING_SCOPES+=("workflow")
-          echo "::warning::Missing 'workflow' scope - cannot access workflows"
-        else
-          echo "::debug::✓ Has 'workflow' scope"
-        fi
-        
-        echo "::notice::✓ Checked for workflow scope"
-        
-        if [ ${#MISSING_SCOPES[@]} -gt 0 ]; then
-          echo "::debug:: there appears to be some sort of issue in the validation"
-          echo "::warn::Missing required scopes: ${MISSING_SCOPES[*]}"
-          # echo "permissions_valid=false" >> $GITHUB_OUTPUT
-          echo "::endgroup::"
-          # exit 1
-        fi
-        
-        echo "::notice::✓ All required token permissions validated successfully"
-        echo "permissions_valid=true" >> $GITHUB_OUTPUT
-        echo "::endgroup::"        

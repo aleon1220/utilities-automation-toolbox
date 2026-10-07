@@ -9,6 +9,11 @@ on:
   # Manual runs from the Actions tab.
   workflow_dispatch:
     inputs:
+      org_name:
+        description: "Account or org to report on (blank = this repo's owner)"
+        required: false
+        type: string
+        default: ""
       full_report:
         description: "Full report (includes all options below)"
         required: false
@@ -39,6 +44,11 @@ on:
         required: false
         type: boolean
         default: false
+      behind_threshold:
+        description: "Conflict risk threshold (commits behind main)"
+        required: false
+        type: number
+        default: 10
       cleanup_dispatch:
         description: "Interactive Automated Cleanup Dispatch"
         required: false
@@ -54,6 +64,11 @@ on:
   # call this reporter as a job via `uses:` with `secrets: inherit`.
   workflow_call:
     inputs:
+      org_name:
+        description: "Account or org to report on (blank = this repo's owner)"
+        required: false
+        type: string
+        default: ""
       full_report:
         description: "Full report (includes all options below)"
         required: false
@@ -84,6 +99,11 @@ on:
         required: false
         type: boolean
         default: false
+      behind_threshold:
+        description: "Conflict risk threshold (commits behind main)"
+        required: false
+        type: number
+        default: 10
       cleanup_dispatch:
         description: "Interactive Automated Cleanup Dispatch"
         required: false
@@ -107,11 +127,12 @@ jobs:
         uses: ./.github/actions/validate-gh-token
         with:
           gh_token: ${{ secrets.ORG_LEVEL_TOKEN }}
+          owner: ${{ inputs.org_name || github.repository_owner }}
 
       - name: Report Repos
         uses: ./.github/actions/report-repos
         with:
-          org_name: ${{ github.repository_owner }}
+          org_name: ${{ inputs.org_name || github.repository_owner }}
           gh_token: ${{ secrets.ORG_LEVEL_TOKEN }}
           full_report: ${{ inputs.full_report }}
           report_only_open_prs: ${{ inputs.report_only_open_prs }}
@@ -119,5 +140,6 @@ jobs:
           pr_status: ${{ inputs.pr_status }}
           diff_links: ${{ inputs.diff_links }}
           behind_main: ${{ inputs.behind_main }}
+          behind_threshold: ${{ inputs.behind_threshold }}
           cleanup_dispatch: ${{ inputs.cleanup_dispatch }}
           debug: ${{ inputs.debug }}
