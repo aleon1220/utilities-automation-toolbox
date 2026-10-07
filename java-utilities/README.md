@@ -20,16 +20,16 @@ uses the format **File Name Format yyyy-MM-dd-EEEE.md** Example: `2026-03-17-Tue
 
 The tool uses **Picocli** to accept command‑line arguments:
 
-| Option                 | Description                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------- |
-| `-s`, `--start`        | Start date `YYYY-MM-DD`                                                         |
-| `-e`, `--end`          | End date `YYYY-MM-DD`                                                           |
-| `-t`, `--this-week`    | Creates WorkLogs for this work week (Monday to Friday)                          |
-| `-d`, `--dryrun`       | Safely execute and mock the execution                                           |
-| `-o`, `--out`          | Base output directory (defaults to `/mnt/c/workspace/TESTS`)                   |
-| `-a`, `--append`       | Target markdown file path to append content to                                  |
-| `-c`, `--content`      | Markdown content to append                                                      |
-| `-h`, `--help`         | Displays the help message and execution examples                                |
+| Option                 | Description                                                         |
+| ---------------------- | ------------------------------------------------------------------- |
+| `-s`, `--start`        | Start date `YYYY-MM-DD`                                             |
+| `-e`, `--end`          | End date `YYYY-MM-DD`                                               |
+| `-t`, `--this-week`    | Creates WorkLogs for this work week (Monday to Friday)              |
+| `-d`, `--dryrun`       | Safely execute and mock the execution                               |
+| `-o`, `--out`          | Base output directory (defaults to `/mnt/c/workspace/TESTS`)        |
+| `-a`, `--append`       | Target markdown file path to append content to                      |
+| `-c`, `--content`      | Markdown content to append                                          |
+| `-h`, `--help`         | Displays the help message and execution examples                    |
 
 ***
 
@@ -139,7 +139,6 @@ todo: implement a dynamic way to identify whether windows or linux
 
 You can download and execute the latest release directly by fetching the version via the GitHub API and running it in the standardized sandbox pattern:
 
-
 * Set up the execution sandbox
 
 ```bash
@@ -147,7 +146,6 @@ EXECUTION_SANDBOX="/mnt/c/workspace/TESTS/"
 mkdir -pv "$EXECUTION_SANDBOX"
 pushd "$EXECUTION_SANDBOX" || exit
 ```
-
 
 * Fetch the latest release version tag from GitHub API
 

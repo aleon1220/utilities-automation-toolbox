@@ -428,14 +428,35 @@ runs:
           PR_TEXT=""
           PR_STATE=""
           if [ "${OPT_PR_STATUS:-false}" = "true" ] || [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ]; then
-            PR_JSON=$(gh pr list -R "${ORG_NAME}/${REPO}" -H "${BR}" --state all --limit 1 --json number,state,url --jq '.[0]' 2>/dev/null || echo "")
+            # Prefer an open PR; otherwise fall back to the most recent PR of any state
+            PR_JSON=$(gh pr list -R "${ORG_NAME}/${REPO}" -H "${BR}" --state all --limit 5 --json number,state,url,isDraft,reviewDecision --jq '(map(select(.state == "OPEN")) + .)[0]' 2>/dev/null || echo "")
             if [ -n "$PR_JSON" ] && [ "$PR_JSON" != "null" ]; then
               PR_NUM=$(echo "$PR_JSON" | jq -r '.number // ""')
               PR_STATE=$(echo "$PR_JSON" | jq -r '.state // ""')
               PR_URL=$(echo "$PR_JSON" | jq -r '.url // ""')
-              PR_TEXT="PR [#${PR_NUM}](${PR_URL}) (${PR_STATE})"
+              PR_DRAFT=$(echo "$PR_JSON" | jq -r '.isDraft')
+              PR_REVIEW=$(echo "$PR_JSON" | jq -r '.reviewDecision // ""')
+              PR_LINK="[#${PR_NUM}](${PR_URL})"
+
+              case "$PR_STATE" in
+                OPEN)
+                  if [ "$PR_DRAFT" = "true" ]; then
+                    PR_TEXT="📝 Draft PR ${PR_LINK}"
+                  else
+                    PR_TEXT="🔀 Open PR ${PR_LINK}"
+                    case "$PR_REVIEW" in
+                      APPROVED) PR_TEXT+=", ✅ approved" ;;
+                      CHANGES_REQUESTED) PR_TEXT+=", ❌ changes requested" ;;
+                      REVIEW_REQUIRED) PR_TEXT+=", 👀 awaiting review" ;;
+                    esac
+                  fi
+                  ;;
+                MERGED) PR_TEXT="🟣 Merged PR ${PR_LINK}" ;;
+                CLOSED) PR_TEXT="🚫 Closed PR ${PR_LINK} (not merged)" ;;
+                *) PR_TEXT="PR ${PR_LINK} (${PR_STATE})" ;;
+              esac
             else
-              PR_TEXT="No PR"
+              PR_TEXT="➕ No PR yet: [create one](https://github.com/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}?expand=1)"
             fi
           fi
 
@@ -600,6 +621,10 @@ runs:
           echo ""
           if [ "${OPT_STALE_AGE:-false}" = "true" ]; then
             echo "Branch age legend (time since last commit): 🟢 Active: under 14 days · 🟡 Stale: 14–30 days · 🔴 Abandoned: over 30 days"
+            echo ""
+          fi
+          if [ "${OPT_PR_STATUS:-false}" = "true" ]; then
+            echo "PR status legend: 🔀 Open · 📝 Draft · 🟣 Merged · 🚫 Closed · ➕ No PR yet. Open PR reviews: ✅ approved · ❌ changes requested · 👀 awaiting review"
             echo ""
           fi
           if [ -s "$PREV_REPOS_FILE" ]; then
