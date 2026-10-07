@@ -39,6 +39,10 @@ inputs:
     description: "Include behind-main & conflict risk indicators"
     required: false
     default: "false"
+  behind_threshold:
+    description: "Commits behind the default branch before a branch is flagged as a conflict risk"
+    required: false
+    default: "10"
   cleanup_dispatch:
     description: "Include interactive automated cleanup dispatch"
     required: false
@@ -143,6 +147,12 @@ runs:
           OPT_CLEANUP_DISPATCH="${{ inputs.cleanup_dispatch }}"
         fi
 
+        BEHIND_THRESHOLD="${{ inputs.behind_threshold }}"
+        if ! [[ "$BEHIND_THRESHOLD" =~ ^[0-9]+$ ]] || [ "$BEHIND_THRESHOLD" -lt 1 ]; then
+          log WARN "Invalid behind_threshold '${BEHIND_THRESHOLD}', falling back to 10"
+          BEHIND_THRESHOLD=10
+        fi
+
         log INFO "Resolved reporting options:"
         log INFO "  full_report=$FULL_REPORT"
         log INFO "  report_only_open_prs=$ONLY_OPEN"
@@ -150,6 +160,7 @@ runs:
         log INFO "  pr_status=$OPT_PR_STATUS"
         log INFO "  diff_links=$OPT_DIFF_LINKS"
         log INFO "  behind_main=$OPT_BEHIND_MAIN"
+        log INFO "  behind_threshold=$BEHIND_THRESHOLD"
         log INFO "  cleanup_dispatch=$OPT_CLEANUP_DISPATCH"
 
         echo "FULL_REPORT=$FULL_REPORT" >> "$GITHUB_ENV"
@@ -158,6 +169,7 @@ runs:
         echo "OPT_PR_STATUS=$OPT_PR_STATUS" >> "$GITHUB_ENV"
         echo "OPT_DIFF_LINKS=$OPT_DIFF_LINKS" >> "$GITHUB_ENV"
         echo "OPT_BEHIND_MAIN=$OPT_BEHIND_MAIN" >> "$GITHUB_ENV"
+        echo "OPT_BEHIND_THRESHOLD=$BEHIND_THRESHOLD" >> "$GITHUB_ENV"
         echo "OPT_CLEANUP_DISPATCH=$OPT_CLEANUP_DISPATCH" >> "$GITHUB_ENV"
 
     - name: List repositories
@@ -370,6 +382,8 @@ runs:
         : > "$DETAILS_FILE"
         CLEANUP_FILE="$RUNNER_TEMP/cleanup_candidates.txt"
         : > "$CLEANUP_FILE"
+        SYNC_FILE="$RUNNER_TEMP/sync_candidates.txt"
+        : > "$SYNC_FILE"
 
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR IS_PREV_MONTH; do
           [ -z "$REPO" ] && continue
@@ -467,12 +481,41 @@ runs:
           fi
 
           # 4. Behind-Main & Conflict Risk Indicators
+          # A branch with no commits ahead has nothing to conflict, so only branches
+          # with their own commits are rated. Above the threshold = high risk, above
+          # 5x the threshold = very high risk.
           BEHIND_TEXT=""
           if [ "${OPT_BEHIND_MAIN:-false}" = "true" ]; then
-            if [ "${BEHIND_BY:-0}" -gt 10 ]; then
-              BEHIND_TEXT="⚠️ Behind main by ${BEHIND_BY} (${AHEAD_BY} ahead)"
+            THRESHOLD="${OPT_BEHIND_THRESHOLD:-10}"
+            AHEAD="${AHEAD_BY:-0}"
+            BEHIND="${BEHIND_BY:-0}"
+            CONFLICT_RISK=false
+
+            BEHIND_WORDS="${BEHIND} commits behind ${DEFAULT_BRANCH}"
+            [ "$BEHIND" -eq 1 ] && BEHIND_WORDS="1 commit behind ${DEFAULT_BRANCH}"
+            AHEAD_WORDS="${AHEAD} commits ahead"
+            [ "$AHEAD" -eq 1 ] && AHEAD_WORDS="1 commit ahead"
+
+            if [ "$BEHIND" -eq 0 ] && [ "$AHEAD" -eq 0 ]; then
+              BEHIND_TEXT="Up to date with ${DEFAULT_BRANCH}, no new commits"
+            elif [ "$BEHIND" -eq 0 ]; then
+              BEHIND_TEXT="Up to date with ${DEFAULT_BRANCH}, ${AHEAD_WORDS}"
+            elif [ "$AHEAD" -eq 0 ]; then
+              BEHIND_TEXT="No new commits, ${BEHIND_WORDS}"
+            elif [ "$BEHIND" -le "$THRESHOLD" ]; then
+              BEHIND_TEXT="Low conflict risk: ${BEHIND_WORDS}, ${AHEAD} ahead"
+            elif [ "$BEHIND" -le $((THRESHOLD * 5)) ]; then
+              BEHIND_TEXT="⚠️ High conflict risk: ${BEHIND_WORDS}, ${AHEAD} ahead"
+              CONFLICT_RISK=true
             else
-              BEHIND_TEXT="${AHEAD_BY} ahead, ${BEHIND_BY} behind"
+              BEHIND_TEXT="🚨 Very high conflict risk: ${BEHIND_WORDS}, ${AHEAD} ahead"
+              CONFLICT_RISK=true
+            fi
+
+            # Flagged branches get a "sync with the default branch" command in the summary.
+            # Merged branches are skipped (when PR status is known) since they are done.
+            if [ "$CONFLICT_RISK" = true ] && [ "$PR_STATE" != "MERGED" ]; then
+              echo "${REPO}|${BR}|${DEFAULT_BRANCH}|${BEHIND}|${AHEAD}" >> "$SYNC_FILE"
             fi
           fi
 
@@ -585,6 +628,8 @@ runs:
         PREV_REPOS_FILE="$RUNNER_TEMP/prev_month_improvement_repos.txt"
         DETAILS_FILE="$RUNNER_TEMP/branch_details.txt"
         CLEANUP_FILE="$RUNNER_TEMP/cleanup_candidates.txt"
+        SYNC_FILE="$RUNNER_TEMP/sync_candidates.txt"
+        THRESHOLD="${OPT_BEHIND_THRESHOLD:-10}"
 
         ACTIVE_OPTIONS=()
         [ "${FULL_REPORT:-false}" = "true" ] && ACTIVE_OPTIONS+=("Full report")
@@ -625,6 +670,10 @@ runs:
           fi
           if [ "${OPT_PR_STATUS:-false}" = "true" ]; then
             echo "PR status legend: 🔀 Open · 📝 Draft · 🟣 Merged · 🚫 Closed · ➕ No PR yet. Open PR reviews: ✅ approved · ❌ changes requested · 👀 awaiting review"
+            echo ""
+          fi
+          if [ "${OPT_BEHIND_MAIN:-false}" = "true" ]; then
+            echo "Conflict risk legend (commits behind the default branch): Low: 1–${THRESHOLD} · ⚠️ High: $((THRESHOLD + 1))–$((THRESHOLD * 5)) · 🚨 Very high: over $((THRESHOLD * 5)). Branches with no new commits have no conflict risk."
             echo ""
           fi
           if [ -s "$PREV_REPOS_FILE" ]; then
@@ -680,6 +729,27 @@ runs:
           else
             echo "- Review qualifying improvement pull requests and merge completed cycles into \`main\`."
             echo "- Run this workflow with \`cleanup_dispatch=true\` (or \`full_report=true\`) to generate cleanup commands for prior months' branches."
+          fi
+
+          if [ "${OPT_BEHIND_MAIN:-false}" = "true" ]; then
+            echo ""
+            echo "### Sync branches at conflict risk"
+            echo ""
+            if [ -s "$SYNC_FILE" ]; then
+              echo "These improvement branches are more than ${THRESHOLD} commits behind their default branch. Merge the default branch into them now, while conflicts are still small:"
+              echo ""
+              while IFS='|' read -r S_REPO S_BR S_BASE S_BEHIND S_AHEAD; do
+                [ -z "$S_REPO" ] && continue
+                echo "- **${S_REPO}**: \`${S_BR}\` (${S_BEHIND} behind \`${S_BASE}\`, ${S_AHEAD} ahead)"
+                echo "  \`\`\`bash"
+                echo "  gh api --method POST -H \"Accept: application/vnd.github+json\" -H \"X-GitHub-Api-Version: 2026-03-10\" repos/${ORG_NAME}/${S_REPO}/merges -f base=${S_BR} -f head=${S_BASE}"
+                echo "  \`\`\`"
+              done < "$SYNC_FILE"
+              echo ""
+              echo "_A \`409 Merge conflict\` response means the branch has real conflicts: merge or rebase it locally instead._"
+            else
+              echo "_No improvement branches with new commits are more than ${THRESHOLD} commits behind their default branch._"
+            fi
           fi
 
           echo ""

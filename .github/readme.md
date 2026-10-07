@@ -39,11 +39,12 @@ default) turns on every option except `report_only_open_prs`.
 | `stale_branch_age` | Time since the last commit with a status: 🟢 Active (under 14 days), 🟡 Stale (14–30 days), 🔴 Abandoned (over 30 days) |
 | `pr_status` | The branch's PR with a direct link and status: 🔀 Open (✅ approved, ❌ changes requested or 👀 awaiting review), 📝 Draft, 🟣 Merged, 🚫 Closed. An open PR takes priority over older PRs. Branches without a PR show ➕ with a link to create one |
 | `diff_links` | A one-click `main...branch` compare link |
-| `behind_main` | Ahead/behind counts, with ⚠️ when the branch is more than 10 commits behind |
+| `behind_main` | How far each branch is behind its default branch, rated Low, ⚠️ High (over the threshold) or 🚨 Very high (over 5× the threshold). Branches with no new commits have no conflict risk. Flagged branches get a ready-to-run sync command under Recommended Next Steps |
+| `behind_threshold` | Commits behind the default branch before a branch counts as high risk (default `10`) |
 | `cleanup_dispatch` | Ready-to-run `gh api` delete commands for merged or empty branches from previous months |
 
-The cleanup commands are only printed, not run. Run them as an account with push
-access to the target repo.
+The cleanup and sync commands are only printed, not run. Run them as an account with
+push access to the target repo.
 
 ## Future Work
 
@@ -53,7 +54,7 @@ the input shown.
 - [x] **Stale Branch Age Tracking** (`stale_branch_age`): Show time since the last commit on each improvement branch to highlight abandoned branches.
 - [x] **Automated PR Status & Direct Links** (`pr_status`): Check if an open PR exists for each improvement branch, with direct links and status indicators.
 - [x] **Direct Diff & Comparison Deep-Links** (`diff_links`): Include one-click GitHub comparison links (`main...branch`) for quick diff inspection.
-- [x] **Behind-Main & Conflict Risk Indicators** (`behind_main`): Flag branches that are far behind the default branch (`behind_by > 10`) to head off merge conflicts.
+- [x] **Behind-Main & Conflict Risk Indicators** (`behind_main`, `behind_threshold`): Flag branches that are significantly behind the default branch (`behind_by > 10` by default) to preempt merge conflicts.
 - [x] **Interactive Automated Cleanup Dispatch** (`cleanup_dispatch`): List merged or obsolete improvement branches from previous months with delete commands.
 - [ ] **Multi-Channel Notifications**: Send the generated report via webhook to Slack, Microsoft Teams or Discord.
 - [ ] **Report Artifact Export (JSON/CSV)**: Export raw and aggregated metrics as downloadable workflow artifacts for historical tracking and trend analysis.

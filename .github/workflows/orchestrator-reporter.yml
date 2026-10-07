@@ -39,6 +39,11 @@ on:
         required: false
         type: boolean
         default: false
+      behind_threshold:
+        description: "Conflict risk threshold (commits behind main)"
+        required: false
+        type: number
+        default: 10
       cleanup_dispatch:
         description: "Interactive Automated Cleanup Dispatch"
         required: false
@@ -84,6 +89,11 @@ on:
         required: false
         type: boolean
         default: false
+      behind_threshold:
+        description: "Conflict risk threshold (commits behind main)"
+        required: false
+        type: number
+        default: 10
       cleanup_dispatch:
         description: "Interactive Automated Cleanup Dispatch"
         required: false
@@ -119,5 +129,6 @@ jobs:
           pr_status: ${{ inputs.pr_status }}
           diff_links: ${{ inputs.diff_links }}
           behind_main: ${{ inputs.behind_main }}
+          behind_threshold: ${{ inputs.behind_threshold }}
           cleanup_dispatch: ${{ inputs.cleanup_dispatch }}
           debug: ${{ inputs.debug }}
