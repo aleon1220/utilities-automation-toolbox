@@ -121,6 +121,22 @@ runs:
             printf "[%s] %s\n" "$level" "$*"
           }
         fi
+        # Calendar days (UTC) between an ISO timestamp and today, so "yesterday" always matches the date shown
+        days_since() {
+          echo $(( ($(date -u -d "$(date -u +%F)" +%s) - $(date -u -d "${1:0:10}" +%s)) / 86400 ))
+        }
+        # Human-friendly relative time for a number of days: "today", "3 days ago", "2 months ago"
+        days_ago() {
+          local d="$1"
+          if [ "$d" -lt 1 ]; then echo "today"
+          elif [ "$d" -eq 1 ]; then echo "yesterday"
+          elif [ "$d" -lt 14 ]; then echo "${d} days ago"
+          elif [ "$d" -lt 60 ]; then echo "$((d / 7)) weeks ago"
+          elif [ "$d" -lt 365 ]; then echo "$((d / 30)) months ago"
+          elif [ "$d" -lt 730 ]; then echo "1 year ago"
+          else echo "$((d / 365)) years ago"
+          fi
+        }
         EOF
         echo "BASH_ENV=$ENV_FILE" >> "$GITHUB_ENV"
         echo "Created a shared bash init file sourced automatically by all subsequent bash steps"
@@ -384,11 +400,17 @@ runs:
         : > "$CLEANUP_FILE"
         SYNC_FILE="$RUNNER_TEMP/sync_candidates.txt"
         : > "$SYNC_FILE"
+        # Raw (unformatted) branch data for the JSON/CSV export
+        BRANCHES_RAW_FILE="$RUNNER_TEMP/branches_raw.txt"
+        : > "$BRANCHES_RAW_FILE"
 
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR IS_PREV_MONTH; do
           [ -z "$REPO" ] && continue
           BRANCHES_ANALYZED=$((BRANCHES_ANALYZED + 1))
-          
+          BR_LAST_COMMIT=""
+          PR_NUM=""
+          RISK_LEVEL=""
+
           log DEBUG "Phase 3: Analyzing branch ${BR} in ${REPO}"
           AHEAD_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "0")
           BEHIND_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.behind_by' 2>/dev/null || echo "0")
@@ -400,28 +422,12 @@ runs:
           AGE_TEXT=""
           if [ "${OPT_STALE_AGE:-false}" = "true" ]; then
             COMMIT_DATE=$(gh api "repos/${ORG_NAME}/${REPO}/branches/${BR}" --jq '.commit.commit.committer.date' 2>/dev/null || echo "")
+            BR_LAST_COMMIT="$COMMIT_DATE"
             if [ -n "$COMMIT_DATE" ]; then
               COMMIT_TS=$(date -d "$COMMIT_DATE" +%s 2>/dev/null || echo "")
               if [ -n "$COMMIT_TS" ]; then
-                NOW_TS=$(date +%s)
-                DAYS_OLD=$(( (NOW_TS - COMMIT_TS) / 86400 ))
-
-                # Human-friendly relative time
-                if [ "$DAYS_OLD" -lt 1 ]; then
-                  AGO="today"
-                elif [ "$DAYS_OLD" -eq 1 ]; then
-                  AGO="yesterday"
-                elif [ "$DAYS_OLD" -lt 14 ]; then
-                  AGO="${DAYS_OLD} days ago"
-                elif [ "$DAYS_OLD" -lt 60 ]; then
-                  AGO="$((DAYS_OLD / 7)) weeks ago"
-                elif [ "$DAYS_OLD" -lt 365 ]; then
-                  AGO="$((DAYS_OLD / 30)) months ago"
-                elif [ "$DAYS_OLD" -lt 730 ]; then
-                  AGO="1 year ago"
-                else
-                  AGO="$((DAYS_OLD / 365)) years ago"
-                fi
+                DAYS_OLD=$(days_since "$COMMIT_DATE")
+                AGO=$(days_ago "$DAYS_OLD")
 
                 # Staleness status (one monthly cycle = abandoned)
                 if [ "$DAYS_OLD" -lt 14 ]; then
@@ -498,17 +504,23 @@ runs:
 
             if [ "$BEHIND" -eq 0 ] && [ "$AHEAD" -eq 0 ]; then
               BEHIND_TEXT="Up to date with ${DEFAULT_BRANCH}, no new commits"
+              RISK_LEVEL="none"
             elif [ "$BEHIND" -eq 0 ]; then
               BEHIND_TEXT="Up to date with ${DEFAULT_BRANCH}, ${AHEAD_WORDS}"
+              RISK_LEVEL="none"
             elif [ "$AHEAD" -eq 0 ]; then
               BEHIND_TEXT="No new commits, ${BEHIND_WORDS}"
+              RISK_LEVEL="none"
             elif [ "$BEHIND" -le "$THRESHOLD" ]; then
               BEHIND_TEXT="Low conflict risk: ${BEHIND_WORDS}, ${AHEAD} ahead"
+              RISK_LEVEL="low"
             elif [ "$BEHIND" -le $((THRESHOLD * 5)) ]; then
               BEHIND_TEXT="⚠️ High conflict risk: ${BEHIND_WORDS}, ${AHEAD} ahead"
+              RISK_LEVEL="high"
               CONFLICT_RISK=true
             else
               BEHIND_TEXT="🚨 Very high conflict risk: ${BEHIND_WORDS}, ${AHEAD} ahead"
+              RISK_LEVEL="very_high"
               CONFLICT_RISK=true
             fi
 
@@ -539,12 +551,13 @@ runs:
           fi
 
           echo "${REPO}|${BR}|${AGE_TEXT}|${PR_TEXT}|${DIFF_TEXT}|${BEHIND_TEXT}" >> "$DETAILS_FILE"
+          echo "${REPO}|${DEFAULT_BRANCH}|${BR}|${IS_PREV_MONTH}|${AHEAD_BY}|${BEHIND_BY}|${BR_LAST_COMMIT}|${PR_NUM}|${PR_STATE}|${RISK_LEVEL}" >> "$BRANCHES_RAW_FILE"
         done < "$RUNNER_TEMP/improvement_branches.txt"
 
         echo "branches_analyzed=${BRANCHES_ANALYZED}" >> "$GITHUB_OUTPUT"
         log INFO "Phase 3 completed: total ${BRANCHES_ANALYZED} github branches analyzed"
 
-    - name: Process repos - Phase 4 - Collect merge history
+    - name: Process repos - Phase 4 - Collect merge history and main branch activity
       id: phase4_merges
       if: steps.enumerate.outputs.status == 'has_repos'
       env:
@@ -554,10 +567,41 @@ runs:
       run: |
         set -Eeuo pipefail
         REPOS_MERGED_CHECKED=0
+        TREND_MONTHS=6
 
-        log INFO "Phase 4: Starting merge history collection"
+        log INFO "Phase 4: Starting merge history and main branch activity collection"
         MERGE_FILE="$RUNNER_TEMP/merge_history.txt"
         : > "$MERGE_FILE"
+        MAIN_FILE="$RUNNER_TEMP/main_activity.txt"
+        : > "$MAIN_FILE"
+
+        # Calendar months for the trend, oldest first. The last one is the current month to date.
+        MONTH_START=$(date -u +%Y-%m-01)
+        MONTHS=()
+        for ((i = TREND_MONTHS - 1; i >= 0; i--)); do
+          MONTHS+=("$(date -u -d "${MONTH_START} -${i} month" +%Y-%m)")
+        done
+        printf "%s\n" "${MONTHS[@]}" > "$RUNNER_TEMP/trend_months.txt"
+
+        # One GraphQL query per repo: last commit on the default branch, commits per month, open PRs
+        HISTORY_FIELDS=""
+        for i in "${!MONTHS[@]}"; do
+          SINCE="${MONTHS[$i]}-01T00:00:00Z"
+          UNTIL=$(date -u -d "${MONTHS[$i]}-01 +1 month" +%Y-%m-01T00:00:00Z)
+          HISTORY_FIELDS+=" m${i}: history(since: \"${SINCE}\", until: \"${UNTIL}\") { totalCount }"
+        done
+        MAIN_QUERY="query(\$owner: String!, \$name: String!, \$base: String!) {
+          repository(owner: \$owner, name: \$name) {
+            defaultBranchRef { target { ... on Commit { committedDate ${HISTORY_FIELDS} } } }
+            pullRequests(states: OPEN, baseRefName: \$base) { totalCount }
+          }
+        }"
+        # -> "lastCommit|openPRs|c0,c1,...,c5"
+        MAIN_JQ='.data.repository as $r | ($r.defaultBranchRef.target // {}) as $t
+          | [($t.committedDate // ""),
+             ($r.pullRequests.totalCount // 0 | tostring),
+             ([range(0; '"${TREND_MONTHS}"')] | map($t["m\(.)"].totalCount // 0 | tostring) | join(","))]
+          | join("|")'
 
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
           [ -z "$REPO" ] && continue
@@ -574,10 +618,37 @@ runs:
           fi
 
           echo "${REPO}|${LAST_MERGED}" >> "$MERGE_FILE"
+
+          # Main branch activity
+          MAIN_ROW=$(gh api graphql -f query="$MAIN_QUERY" -f owner="$ORG_NAME" -f name="$REPO" -f base="$DEFAULT_BRANCH" --jq "$MAIN_JQ" 2>/dev/null || echo "")
+          IFS='|' read -r LAST_COMMIT OPEN_PRS COUNTS <<< "${MAIN_ROW:-||}"
+          if [ -z "$MAIN_ROW" ]; then
+            log WARN "Phase 4: Could not read ${DEFAULT_BRANCH} activity for ${REPO}"
+          fi
+
+          TOTAL=0
+          IFS=',' read -r -a COUNT_LIST <<< "$COUNTS"
+          for C in "${COUNT_LIST[@]}"; do TOTAL=$((TOTAL + ${C:-0})); done
+
+          DAYS_SINCE=""
+          ACTIVITY="unknown"
+          if [ -n "$LAST_COMMIT" ]; then
+            DAYS_SINCE=$(days_since "$LAST_COMMIT")
+            if [ "$DAYS_SINCE" -le 30 ]; then
+              ACTIVITY="active"
+            elif [ "$DAYS_SINCE" -le 90 ]; then
+              ACTIVITY="quiet"
+            else
+              ACTIVITY="dormant"
+            fi
+          fi
+
+          log INFO "Phase 4: ${REPO} ${DEFAULT_BRANCH} activity=${ACTIVITY} last_commit=${LAST_COMMIT:-none} commits_by_month=${COUNTS:-n/a} open_prs=${OPEN_PRS:-n/a}"
+          echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${LAST_COMMIT}|${DAYS_SINCE}|${ACTIVITY}|${OPEN_PRS:-0}|${TOTAL}|${COUNTS}|${LAST_MERGED}" >> "$MAIN_FILE"
         done < "$RUNNER_TEMP/repos_metadata.txt"
-        
+
         echo "repos_checked=${REPOS_MERGED_CHECKED}" >> "$GITHUB_OUTPUT"
-        log INFO "Phase 4 completed: ${REPOS_MERGED_CHECKED} repositories checked for merge history"
+        log INFO "Phase 4 completed: ${REPOS_MERGED_CHECKED} repositories checked for merge history and main branch activity"
 
     - name: Process repos - Phase 5 - Aggregate results generate reports
       id: process
@@ -616,6 +687,155 @@ runs:
         log INFO "Phase 5 completed: Results aggregation finished"
         log INFO "Processing workflow completed successfully"
 
+    - name: Render main branch trend
+      if: steps.enumerate.outputs.status == 'has_repos'
+      env:
+        ORG_NAME: ${{ inputs.org_name }}
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        MAIN_FILE="$RUNNER_TEMP/main_activity.txt"
+        SECTION_FILE="$RUNNER_TEMP/main_section.md"
+        : > "$SECTION_FILE"
+        [ -s "$MAIN_FILE" ] || { log WARN "No main branch activity collected"; exit 0; }
+        mapfile -t MONTHS < "$RUNNER_TEMP/trend_months.txt"
+        N_MONTHS=${#MONTHS[@]}
+
+        # Per-row sparkline scaled to the row's own peak; "·" = no commits that month
+        sparkline() {
+          local -a counts bars=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █)
+          local c max=0 out=""
+          IFS=',' read -r -a counts <<< "$1"
+          for c in "${counts[@]}"; do
+            if [ "${c:-0}" -gt "$max" ]; then max="$c"; fi
+          done
+          for c in "${counts[@]}"; do
+            if [ "${c:-0}" -eq 0 ]; then out+="·"; else out+="${bars[$(( c * 7 / max ))]}"; fi
+          done
+          echo "${out:-–}"
+        }
+        activity_label() {
+          case "$1" in
+            active) echo "✨ Active" ;;
+            quiet) echo "🌙 Quiet" ;;
+            dormant) echo "💤 Dormant" ;;
+            *) echo "❔ Unknown" ;;
+          esac
+        }
+
+        # Totals across all repos
+        declare -A ACT_COUNT=([active]=0 [quiet]=0 [dormant]=0 [unknown]=0)
+        MONTH_TOTALS=()
+        for ((i = 0; i < N_MONTHS; i++)); do MONTH_TOTALS+=(0); done
+        OPEN_PRS_TOTAL=0
+        REPO_COUNT=0
+        ROWS_FILE="$RUNNER_TEMP/main_rows.txt"
+        : > "$ROWS_FILE"
+
+        while IFS='|' read -r REPO BRANCH VIS LAST_COMMIT DAYS ACTIVITY OPEN_PRS TOTAL COUNTS LAST_MERGED; do
+          [ -z "$REPO" ] && continue
+          REPO_COUNT=$((REPO_COUNT + 1))
+          ACT_COUNT[$ACTIVITY]=$(( ${ACT_COUNT[$ACTIVITY]:-0} + 1 ))
+          OPEN_PRS_TOTAL=$((OPEN_PRS_TOTAL + ${OPEN_PRS:-0}))
+          IFS=',' read -r -a COUNT_LIST <<< "$COUNTS"
+          for i in "${!COUNT_LIST[@]}"; do
+            MONTH_TOTALS[$i]=$(( MONTH_TOTALS[$i] + ${COUNT_LIST[$i]:-0} ))
+          done
+          # Sort key: active/quiet first (most commits, then most recent), dormant/unknown after
+          GROUP=0
+          case "$ACTIVITY" in dormant|unknown) GROUP=1 ;; esac
+          echo "${GROUP}|${TOTAL:-0}|${DAYS:-99999}|${REPO}|${BRANCH}|${LAST_COMMIT}|${DAYS}|${ACTIVITY}|${OPEN_PRS:-0}|${COUNTS}|${LAST_MERGED}" >> "$ROWS_FILE"
+        done < "$MAIN_FILE"
+        sort -t'|' -k1,1n -k2,2nr -k3,3n -o "$ROWS_FILE" "$ROWS_FILE"
+
+        WINDOW_TOTAL=0
+        PEAK=1
+        for t in "${MONTH_TOTALS[@]}"; do
+          WINDOW_TOTAL=$((WINDOW_TOTAL + t))
+          if [ "$t" -gt "$PEAK" ]; then PEAK="$t"; fi
+        done
+        X_AXIS=$(printf '"%s", ' "${MONTHS[@]}"); X_AXIS="[${X_AXIS%, }]"
+        SERIES=$(printf '%s, ' "${MONTH_TOTALS[@]}"); SERIES="[${SERIES%, }]"
+
+        table_header() {
+          echo "| Repo | Branch | Activity | Last commit | Trend (${MONTHS[0]} → ${MONTHS[$((N_MONTHS - 1))]}) | Commits | Open PRs | Last merged PR |"
+          echo "| --- | --- | --- | --- | --- | ---: | ---: | --- |"
+        }
+        table_row() {
+          local repo="$1" branch="$2" last="$3" days="$4" activity="$5" prs="$6" counts="$7" merged="$8" total="$9"
+          local last_text="–" merged_text="–"
+          if [ -n "$last" ]; then last_text="$(days_ago "$days") (${last:0:10})"; fi
+          if [ -n "$merged" ] && [ "$merged" != "none" ]; then
+            merged_text=$(days_ago "$(days_since "$merged")")
+          fi
+          echo "| [${repo}](https://github.com/${ORG_NAME}/${repo}) | [\`${branch}\`](https://github.com/${ORG_NAME}/${repo}/commits/${branch}) | $(activity_label "$activity") | ${last_text} | \`$(sparkline "$counts")\` | ${total} | ${prs} | ${merged_text} |"
+        }
+
+        {
+          echo "### Main branches across all repos"
+          echo ""
+          echo "- Repos: ${REPO_COUNT} · ✨ Active: ${ACT_COUNT[active]} · 🌙 Quiet: ${ACT_COUNT[quiet]} · 💤 Dormant: ${ACT_COUNT[dormant]} · ❔ Unknown: ${ACT_COUNT[unknown]}"
+          echo "- Commits to default branches in the last ${N_MONTHS} months: ${WINDOW_TOTAL} (this month so far: ${MONTH_TOTALS[$((N_MONTHS - 1))]})"
+          echo "- Open PRs targeting default branches: ${OPEN_PRS_TOTAL}"
+          echo ""
+          echo "Activity legend (last commit on the default branch): ✨ Active: last 30 days · 🌙 Quiet: 31–90 days · 💤 Dormant: over 90 days · ❔ Unknown: empty repo or no access"
+          echo ""
+          echo '```mermaid'
+          echo "xychart-beta"
+          echo "    title \"Commits to default branches, all repos (${MONTHS[$((N_MONTHS - 1))]} is month to date)\""
+          echo "    x-axis ${X_AXIS}"
+          echo "    y-axis \"Commits\" 0 --> ${PEAK}"
+          echo "    bar ${SERIES}"
+          echo "    line ${SERIES}"
+          echo '```'
+          echo ""
+
+          # Share of commits per repo: top 8, the rest grouped
+          if [ "$WINDOW_TOTAL" -gt 0 ]; then
+            echo '```mermaid'
+            echo "pie showData"
+            echo "    title Share of commits to default branches (last ${N_MONTHS} months)"
+            OTHER=0
+            RANK=0
+            while IFS='|' read -r _ TOTAL _ REPO _; do
+              [ "${TOTAL:-0}" -gt 0 ] || continue
+              RANK=$((RANK + 1))
+              if [ "$RANK" -le 8 ]; then
+                echo "    \"${REPO}\" : ${TOTAL}"
+              else
+                OTHER=$((OTHER + TOTAL))
+              fi
+            done < <(sort -t'|' -k2,2nr "$ROWS_FILE")
+            if [ "$OTHER" -gt 0 ]; then echo "    \"Other repos\" : ${OTHER}"; fi
+            echo '```'
+            echo ""
+          fi
+
+          table_header
+          while IFS='|' read -r GROUP TOTAL _ REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED; do
+            if [ "$GROUP" = "0" ]; then
+              table_row "$REPO" "$BRANCH" "$LAST" "$DAYS" "$ACTIVITY" "$PRS" "$COUNTS" "$MERGED" "$TOTAL"
+            fi
+          done < "$ROWS_FILE"
+          echo ""
+
+          IDLE_COUNT=$(( ${ACT_COUNT[dormant]} + ${ACT_COUNT[unknown]} ))
+          if [ "$IDLE_COUNT" -gt 0 ]; then
+            echo "<details><summary>💤 ${IDLE_COUNT} dormant or unknown repos</summary>"
+            echo ""
+            table_header
+            while IFS='|' read -r GROUP TOTAL _ REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED; do
+              if [ "$GROUP" = "1" ]; then
+                table_row "$REPO" "$BRANCH" "$LAST" "$DAYS" "$ACTIVITY" "$PRS" "$COUNTS" "$MERGED" "$TOTAL"
+              fi
+            done < "$ROWS_FILE"
+            echo ""
+            echo "</details>"
+            echo ""
+          fi
+        } > "$SECTION_FILE"
+        log INFO "Rendered main branch trend for ${REPO_COUNT} repos"
+
     - name: Summary with Github repos
       if: steps.enumerate.outputs.status == 'has_repos'
       env:
@@ -629,7 +849,11 @@ runs:
         DETAILS_FILE="$RUNNER_TEMP/branch_details.txt"
         CLEANUP_FILE="$RUNNER_TEMP/cleanup_candidates.txt"
         SYNC_FILE="$RUNNER_TEMP/sync_candidates.txt"
+        MAIN_SECTION_FILE="$RUNNER_TEMP/main_section.md"
         THRESHOLD="${OPT_BEHIND_THRESHOLD:-10}"
+        # A copy of the summary is kept as report.md in the exported artifact
+        REPORT_DIR="$RUNNER_TEMP/repos-report"
+        mkdir -p "$REPORT_DIR"
 
         ACTIVE_OPTIONS=()
         [ "${FULL_REPORT:-false}" = "true" ] && ACTIVE_OPTIONS+=("Full report")
@@ -660,6 +884,9 @@ runs:
           echo "- Repos with improvement branches: ${IMP}"
           echo "- Reporting tweaks: ${OPTIONS_STR}"
           echo ""
+          if [ -s "$MAIN_SECTION_FILE" ]; then
+            cat "$MAIN_SECTION_FILE"
+          fi
           echo "### Repos with improvement branches from previous months"
           echo ""
           echo "Current month: ${CURRENT_MONTH}"
@@ -754,6 +981,127 @@ runs:
 
           echo ""
           echo "_Report options and roadmap: [.github/readme.md](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/.github/readme.md#future-work)_"
+        } | tee "$REPORT_DIR/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Export report data (JSON/CSV)
+      if: steps.enumerate.outputs.status == 'has_repos'
+      env:
+        ORG_NAME: ${{ inputs.org_name }}
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        REPORT_DIR="$RUNNER_TEMP/repos-report"
+        mkdir -p "$REPORT_DIR"
+        MAIN_FILE="$RUNNER_TEMP/main_activity.txt"
+        BRANCHES_RAW_FILE="$RUNNER_TEMP/branches_raw.txt"
+        touch "$MAIN_FILE" "$BRANCHES_RAW_FILE"
+        GENERATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        MONTHS_JSON=$(jq -R . "$RUNNER_TEMP/trend_months.txt" | jq -s -c .)
+
+        # Raw data -> JSON (pipe-delimited files written by phases 3 and 4)
+        jq -R -s -c --argjson months "$MONTHS_JSON" '
+          split("\n") | map(select(length > 0) | split("|")) | map({
+            repo: .[0], default_branch: .[1], visibility: .[2],
+            last_commit_at: (if .[3] == "" then null else .[3] end),
+            days_since_last_commit: (.[4] | tonumber? // null),
+            activity: .[5],
+            open_prs_to_default: (.[6] | tonumber? // 0),
+            commits_in_window: (.[7] | tonumber? // 0),
+            commits_by_month: ([$months, (.[8] // "" | split(","))] | transpose
+              | map(select(.[0] != null) | {(.[0]): (.[1] // "0" | tonumber? // 0)}) | add // {}),
+            last_pr_merged_at: (if .[9] == "" or .[9] == "none" then null else .[9] end)
+          })' "$MAIN_FILE" > "$REPORT_DIR/main_branches.json"
+
+        jq -R -s -c '
+          split("\n") | map(select(length > 0) | split("|")) | map({
+            repo: .[0], default_branch: .[1], branch: .[2],
+            from_previous_month: (.[3] == "true"),
+            ahead_by: (.[4] | tonumber? // null),
+            behind_by: (.[5] | tonumber? // null),
+            last_commit_at: (if .[6] == "" then null else .[6] end),
+            pr_number: (.[7] | tonumber? // null),
+            pr_state: (if .[8] == "" then null else .[8] end),
+            conflict_risk: (if .[9] == "" then null else .[9] end)
+          })' "$BRANCHES_RAW_FILE" > "$REPORT_DIR/improvement_branches.json"
+
+        # CSV: one row per repo (wide), one row per repo per month (long, for trend tools), one row per branch
+        jq -r --argjson months "$MONTHS_JSON" '
+          (["repo","default_branch","visibility","last_commit_at","days_since_last_commit","activity",
+            "open_prs_to_default","last_pr_merged_at","commits_last_\($months | length)_months"]
+            + ($months | map("commits_" + .))),
+          (.[] | [.repo, .default_branch, .visibility, .last_commit_at, .days_since_last_commit, .activity,
+                  .open_prs_to_default, .last_pr_merged_at, .commits_in_window]
+                 + [.commits_by_month[$months[]]])
+          | @csv' "$REPORT_DIR/main_branches.json" > "$REPORT_DIR/main_branches.csv"
+
+        jq -r --arg date "${GENERATED_AT:0:10}" --arg owner "$ORG_NAME" '
+          ["report_date","owner","repo","default_branch","month","commits"],
+          (.[] | . as $r | .commits_by_month | to_entries[] | [$date, $owner, $r.repo, $r.default_branch, .key, .value])
+          | @csv' "$REPORT_DIR/main_branches.json" > "$REPORT_DIR/main_commits_monthly.csv"
+
+        jq -r '
+          ["repo","default_branch","branch","from_previous_month","ahead_by","behind_by",
+           "last_commit_at","pr_number","pr_state","conflict_risk"],
+          (.[] | [.repo, .default_branch, .branch, (.from_previous_month | tostring), .ahead_by, .behind_by,
+                  .last_commit_at, .pr_number, .pr_state, .conflict_risk])
+          | @csv' "$REPORT_DIR/improvement_branches.json" > "$REPORT_DIR/improvement_branches.csv"
+
+        # Aggregated metrics + run metadata
+        jq -n \
+          --arg generated_at "$GENERATED_AT" \
+          --arg owner "$ORG_NAME" \
+          --arg run_id "${GITHUB_RUN_ID}" \
+          --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+          --argjson months "$MONTHS_JSON" \
+          --argjson options "$(jq -n \
+            --arg full_report "${FULL_REPORT:-false}" --arg only_open_prs "${OPT_ONLY_OPEN_PRS:-false}" \
+            --arg stale_branch_age "${OPT_STALE_AGE:-false}" --arg pr_status "${OPT_PR_STATUS:-false}" \
+            --arg diff_links "${OPT_DIFF_LINKS:-false}" --arg behind_main "${OPT_BEHIND_MAIN:-false}" \
+            --arg behind_threshold "${OPT_BEHIND_THRESHOLD:-10}" --arg cleanup_dispatch "${OPT_CLEANUP_DISPATCH:-false}" \
+            '$ARGS.named | with_entries(.value |= (if . == "true" then true elif . == "false" then false else (tonumber? // .) end))')" \
+          --slurpfile repos "$REPORT_DIR/main_branches.json" \
+          --slurpfile branches "$REPORT_DIR/improvement_branches.json" '
+          $repos[0] as $r | $branches[0] as $b | {
+            generated_at: $generated_at,
+            owner: $owner,
+            run: {id: $run_id, url: $run_url},
+            options: $options,
+            trend_months: $months,
+            totals: {
+              repos: ($r | length),
+              main_activity: ({active: 0, quiet: 0, dormant: 0, unknown: 0}
+                + ($r | group_by(.activity) | map({(.[0].activity): length}) | add // {})),
+              main_commits_by_month: ($months | map(. as $m | {($m): ($r | map(.commits_by_month[$m] // 0) | add // 0)}) | add // {}),
+              open_prs_to_default: ($r | map(.open_prs_to_default) | add // 0),
+              repos_with_improvement_branches: ($b | map(.repo) | unique | length),
+              improvement_branches: ($b | length),
+              improvement_branches_at_conflict_risk: ($b | map(select(.conflict_risk == "high" or .conflict_risk == "very_high")) | length)
+            }
+          }' > "$REPORT_DIR/summary.json"
+
+        log INFO "Exported report data to ${REPORT_DIR}:"
+        ls -la "$REPORT_DIR"
+
+    - name: Upload report artifact
+      id: upload_report
+      if: steps.enumerate.outputs.status == 'has_repos'
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: repos-report-${{ inputs.org_name }}
+        path: ${{ runner.temp }}/repos-report/
+        retention-days: 90
+        overwrite: true
+        if-no-files-found: warn
+
+    - name: Link report artifact in summary
+      if: steps.upload_report.outputs.artifact-url != ''
+      env:
+        ARTIFACT_URL: ${{ steps.upload_report.outputs.artifact-url }}
+      shell: bash
+      run: |
+        {
+          echo ""
+          echo "📦 [Download the report data](${ARTIFACT_URL}) (JSON/CSV and this summary as \`report.md\`, kept for 90 days)"
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Summary No repos

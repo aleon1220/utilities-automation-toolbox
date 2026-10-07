@@ -9,6 +9,11 @@ on:
   # Manual runs from the Actions tab.
   workflow_dispatch:
     inputs:
+      org_name:
+        description: "Account or org to report on (blank = this repo's owner)"
+        required: false
+        type: string
+        default: ""
       full_report:
         description: "Full report (includes all options below)"
         required: false
@@ -59,6 +64,11 @@ on:
   # call this reporter as a job via `uses:` with `secrets: inherit`.
   workflow_call:
     inputs:
+      org_name:
+        description: "Account or org to report on (blank = this repo's owner)"
+        required: false
+        type: string
+        default: ""
       full_report:
         description: "Full report (includes all options below)"
         required: false
@@ -117,11 +127,12 @@ jobs:
         uses: ./.github/actions/validate-gh-token
         with:
           gh_token: ${{ secrets.ORG_LEVEL_TOKEN }}
+          owner: ${{ inputs.org_name || github.repository_owner }}
 
       - name: Report Repos
         uses: ./.github/actions/report-repos
         with:
-          org_name: ${{ github.repository_owner }}
+          org_name: ${{ inputs.org_name || github.repository_owner }}
           gh_token: ${{ secrets.ORG_LEVEL_TOKEN }}
           full_report: ${{ inputs.full_report }}
           report_only_open_prs: ${{ inputs.report_only_open_prs }}

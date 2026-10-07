@@ -11,7 +11,7 @@ A collection of Bash, Java, PowerShell, Python utilities
 
 This repo operates as the orchestrator repo for other git repos.
 
-See [GitHub Automation](.github/readme.md) for the workflows, composite actions, Repos Reporter options and the reporter roadmap.
+See [GitHub Automation](.github/readme.md) for the workflows, composite actions, Repos Reporter options, token and org access setup, and the reporter roadmap.
 
 ## Structure
 
