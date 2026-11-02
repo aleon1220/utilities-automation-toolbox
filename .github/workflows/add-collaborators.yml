@@ -1,4 +1,4 @@
-name: Add Collaborators to Repositories
+name: github-admin Add Collaborators to Repositories
 permissions:
   contents: read
   pull-requests: write
