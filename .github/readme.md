@@ -34,17 +34,19 @@ Every run covers all non-archived repos of one user or org and always includes:
 
 - **Main branches across all repos**: how many repos are ✨ Active (commit on the default
   branch in the last 30 days), 🌙 Quiet (31–90 days) or 💤 Dormant (over 90 days), plus
-  Mermaid charts of commits to default branches per month (last 6 months) and each repo's
-  share. A table per repo shows a monthly trend sparkline, commit count, open PRs and the
-  last merged PR. Dormant repos are folded away.
+  Mermaid charts of commits to default branches per month (last 6 months), per week
+  (last 6 ISO weeks, Monday–Sunday UTC) and each repo's share. A table per repo shows a
+  monthly trend sparkline, commit count, open PRs and the last merged PR. Dormant repos are
+  folded away.
 - **Report data artifact** (`repos-report-<owner>`, kept 90 days), linked at the bottom of the
   summary:
 
   | File | Contents |
   | --- | --- |
-  | `summary.json` | Run metadata, options and aggregated totals (activity counts, commits per month, open PRs, branches at conflict risk) |
-  | `main_branches.json` / `.csv` | One row per repo: default branch, last commit, activity, open PRs, last merged PR, commits per month |
+  | `summary.json` | Run metadata, options and aggregated totals (activity counts, commits per month and week, open PRs, branches at conflict risk) |
+  | `main_branches.json` / `.csv` | One row per repo: default branch, last commit, activity, open PRs, last merged PR, commits per month (`commits_by_week` also in JSON) |
   | `main_commits_monthly.csv` | One row per repo per month, stamped with the report date, ready for spreadsheets or BI trend charts |
+  | `main_commits_weekly.csv` | One row per repo per ISO week (Monday UTC start), stamped with the report date, for short-term velocity trends |
   | `improvement_branches.json` / `.csv` | One row per improvement branch: ahead/behind, last commit, PR number and state, conflict risk |
   | `report.md` | A copy of the job summary |
 

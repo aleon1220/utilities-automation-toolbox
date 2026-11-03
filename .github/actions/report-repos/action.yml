@@ -818,16 +818,34 @@ runs:
         done
         X_AXIS=$(printf '"%s", ' "${MONTHS[@]}"); X_AXIS="[${X_AXIS%, }]"
         SERIES=$(printf '%s, ' "${MONTH_TOTALS[@]}"); SERIES="[${SERIES%, }]"
-        WEEK_PEAK=1
-        for t in "${WEEK_TOTALS[@]}"; do
-          if [ "$t" -gt "$WEEK_PEAK" ]; then WEEK_PEAK="$t"; fi
-        done
-        WEEK_X_AXIS=""
         WEEK_X_LABELS=()
         for week in "${WEEKS[@]}"; do
-          ISO_WEEK=$(date -u -d "$week" +%G-W%V)
-          WEEK_X_LABELS+=("${ISO_WEEK}, ${week} Monday")
+          WEEK_X_LABELS+=("$(LC_ALL=C date -u -d "$week" +"W%V · %b %d")")
         done
+        WEEK_WINDOW_TOTAL=0
+        WEEK_PEAK_VAL=0
+        WEEK_PEAK_IDX=0
+        for i in "${!WEEK_TOTALS[@]}"; do
+          t="${WEEK_TOTALS[$i]}"
+          WEEK_WINDOW_TOTAL=$((WEEK_WINDOW_TOTAL + t))
+          if [ "$t" -ge "$WEEK_PEAK_VAL" ]; then
+            WEEK_PEAK_VAL="$t"
+            WEEK_PEAK_IDX="$i"
+          fi
+        done
+        WEEK_Y_MAX=$(( WEEK_PEAK_VAL + (WEEK_PEAK_VAL + 4) / 5 ))
+        if [ "$WEEK_Y_MAX" -lt 4 ]; then WEEK_Y_MAX=4; fi
+        CURRENT_ISO_WEEK=$(LC_ALL=C date -u -d "${WEEKS[$((N_WEEKS - 1))]}" +W%V)
+        THIS_WEEK_COMMITS="${WEEK_TOTALS[$((N_WEEKS - 1))]}"
+        WEEK_SUMMARY_LINE="- Commits in the last ${N_WEEKS} weeks: ${WEEK_WINDOW_TOTAL} · This week so far (\`${CURRENT_ISO_WEEK}\`): ${THIS_WEEK_COMMITS}"
+        if [ "$N_WEEKS" -ge 2 ]; then
+          PREV_ISO_WEEK=$(LC_ALL=C date -u -d "${WEEKS[$((N_WEEKS - 2))]}" +W%V)
+          PREV_WEEK_COMMITS="${WEEK_TOTALS[$((N_WEEKS - 2))]}"
+          WEEK_SUMMARY_LINE+=" · Last full week (\`${PREV_ISO_WEEK}\`): ${PREV_WEEK_COMMITS}"
+        fi
+        if [ "$WEEK_WINDOW_TOTAL" -gt 0 ]; then
+          WEEK_SUMMARY_LINE+=" · Peak week: ${WEEK_PEAK_VAL} (\`${WEEK_X_LABELS[$WEEK_PEAK_IDX]}\`)"
+        fi
         WEEK_X_AXIS=$(printf '"%s", ' "${WEEK_X_LABELS[@]}"); WEEK_X_AXIS="[${WEEK_X_AXIS%, }]"
         WEEK_SERIES=$(printf '%s, ' "${WEEK_TOTALS[@]}"); WEEK_SERIES="[${WEEK_SERIES%, }]"
 
@@ -865,11 +883,28 @@ runs:
           echo ""
           echo "### Commits to default branches by week, all repos"
           echo ""
+          echo "Short-term delivery cadence across all default branches over the last ${N_WEEKS} ISO weeks (\`${WEEK_X_LABELS[0]}\` → \`${WEEK_X_LABELS[$((N_WEEKS - 1))]}\`). Each bar aggregates commits from Monday \`00:00 UTC\` to Sunday \`23:59 UTC\` (labeled with its Monday start date), and the trend line tracks week-over-week momentum; \`${CURRENT_ISO_WEEK}\` reflects the current week to date."
+          echo ""
+          echo "${WEEK_SUMMARY_LINE}"
+          echo ""
           echo '```mermaid'
+          echo "---"
+          echo "config:"
+          echo "  xyChart:"
+          echo "    width: 900"
+          echo "    height: 320"
+          echo "    titleFontSize: 16"
+          echo "    xAxis:"
+          echo "      labelFontSize: 12"
+          echo "      labelPadding: 6"
+          echo "    yAxis:"
+          echo "      labelFontSize: 12"
+          echo "      titleFontSize: 13"
+          echo "---"
           echo "xychart-beta"
-          echo "    title \"Commits to default branches by week, all repos\""
+          echo "    title \"Commits to default branches by week, all repos (${CURRENT_ISO_WEEK} is week to date)\""
           echo "    x-axis ${WEEK_X_AXIS}"
-          echo "    y-axis \"Commits\" 0 --> ${WEEK_PEAK}"
+          echo "    y-axis \"Commits\" 0 --> ${WEEK_Y_MAX}"
           echo "    bar ${WEEK_SERIES}"
           echo "    line ${WEEK_SERIES}"
           echo '```'
