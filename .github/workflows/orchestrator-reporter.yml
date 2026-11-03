@@ -14,46 +14,24 @@ on:
         required: false
         type: string
         default: ""
-      full_report:
-        description: "Full report (includes all options below)"
+      report_action:
+        description: "Single report operation to run"
         required: false
-        type: boolean
-        default: true
-      report_only_open_prs:
-        description: "Report only Open PRs"
-        required: false
-        type: boolean
-        default: false
-      stale_branch_age:
-        description: "Stale Branch Age Tracking"
-        required: false
-        type: boolean
-        default: false
-      pr_status:
-        description: "PR Status & Direct Links"
-        required: false
-        type: boolean
-        default: false
-      diff_links:
-        description: "Direct Diff & Comparison Deep-Links"
-        required: false
-        type: boolean
-        default: false
-      behind_main:
-        description: "Behind-Main & Conflict Risk Indicators"
-        required: false
-        type: boolean
-        default: false
+        type: choice
+        default: full_report
+        options:
+          - full_report
+          - report_only_open_prs
+          - stale_branch_age
+          - pr_status
+          - diff_links
+          - behind_main
+          - cleanup_dispatch
       behind_threshold:
         description: "Conflict risk threshold (commits behind main)"
         required: false
         type: number
         default: 10
-      cleanup_dispatch:
-        description: "Interactive Automated Cleanup Dispatch"
-        required: false
-        type: boolean
-        default: false
       debug:
         description: "Enable debug logging"
         required: false
@@ -69,6 +47,10 @@ on:
         required: false
         type: string
         default: ""
+      report_action:
+        description: "Single report operation (leave blank for legacy boolean inputs)"
+        required: false
+        type: string
       full_report:
         description: "Full report (includes all options below)"
         required: false
@@ -134,6 +116,7 @@ jobs:
         with:
           org_name: ${{ inputs.org_name || github.repository_owner }}
           gh_token: ${{ secrets.ORG_LEVEL_TOKEN }}
+          report_action: ${{ inputs.report_action }}
           full_report: ${{ inputs.full_report }}
           report_only_open_prs: ${{ inputs.report_only_open_prs }}
           stale_branch_age: ${{ inputs.stale_branch_age }}

@@ -1,4 +1,4 @@
-name: github Smoke Test actions workflow
+name: github-orchestrate Smoke Test actions workflow
 # Smoke test GitHub Actions in main branch basic workflow manually triggered
 # todo: add smoke test of composite functions and reusable workflows
 

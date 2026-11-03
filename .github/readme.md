@@ -50,10 +50,21 @@ Every run covers all non-archived repos of one user or org and always includes:
 
 ### Options
 
-Most options are boolean inputs on the reporter workflow. `full_report` (on by default)
-turns on every boolean option except `report_only_open_prs`.
+The manual workflow uses `report_action` to run one operation at a time. It defaults to
+`full_report`; the legacy boolean inputs remain available to reusable workflows for
+backward compatibility.
 
-| Input | Adds to the report |
+| Action | Report operation |
+| --- | --- |
+| `full_report` | Runs the complete report (the default) |
+| `report_only_open_prs` | Limits the report to branches with an open PR |
+| `stale_branch_age` | Adds time since the last commit and stale/abandoned status |
+| `pr_status` | Adds the branch's PR status and direct link |
+| `diff_links` | Adds direct `main...branch` comparison links |
+| `behind_main` | Adds behind-main counts and conflict-risk indicators |
+| `cleanup_dispatch` | Adds automated cleanup commands for eligible previous-month branches |
+
+| Legacy reusable-workflow input | Adds to the report |
 | --- | --- |
 | `org_name` | User or org to report on. Blank means this repo's owner (`aleon1220`). See [Token and access](#token-and-access) |
 | `report_only_open_prs` | Limits the report to branches with an open PR |

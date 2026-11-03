@@ -15,8 +15,12 @@ inputs:
   gh_token:
     description: "GitHub token"
     required: true
+  report_action:
+    description: "Single report operation; takes precedence over legacy boolean inputs"
+    required: false
+    default: ""
   full_report:
-    description: "Enable full report (all features)"
+    description: "Legacy: Enable full report (all features)"
     required: false
     default: "true"
   report_only_open_prs:
@@ -146,21 +150,55 @@ runs:
       shell: bash
       run: |
         set -Eeuo pipefail
+        REPORT_ACTION="${{ inputs.report_action }}"
         FULL_REPORT="${{ inputs.full_report }}"
         ONLY_OPEN="${{ inputs.report_only_open_prs }}"
 
-        if [ "$FULL_REPORT" = "true" ]; then
-          OPT_STALE_AGE=true
-          OPT_PR_STATUS=true
-          OPT_DIFF_LINKS=true
-          OPT_BEHIND_MAIN=true
-          OPT_CLEANUP_DISPATCH=true
-        else
-          OPT_STALE_AGE="${{ inputs.stale_branch_age }}"
-          OPT_PR_STATUS="${{ inputs.pr_status }}"
-          OPT_DIFF_LINKS="${{ inputs.diff_links }}"
-          OPT_BEHIND_MAIN="${{ inputs.behind_main }}"
-          OPT_CLEANUP_DISPATCH="${{ inputs.cleanup_dispatch }}"
+        OPT_STALE_AGE=false
+        OPT_PR_STATUS=false
+        OPT_DIFF_LINKS=false
+        OPT_BEHIND_MAIN=false
+        OPT_CLEANUP_DISPATCH=false
+
+        if [ -n "$REPORT_ACTION" ]; then
+          FULL_REPORT=false
+          ONLY_OPEN=false
+          case "$REPORT_ACTION" in
+            full_report)
+              FULL_REPORT=true
+              OPT_STALE_AGE=true
+              OPT_PR_STATUS=true
+              OPT_DIFF_LINKS=true
+              OPT_BEHIND_MAIN=true
+              OPT_CLEANUP_DISPATCH=true
+              ;;
+            report_only_open_prs) ONLY_OPEN=true ;;
+            stale_branch_age) OPT_STALE_AGE=true ;;
+            pr_status) OPT_PR_STATUS=true ;;
+            diff_links) OPT_DIFF_LINKS=true ;;
+            behind_main) OPT_BEHIND_MAIN=true ;;
+            cleanup_dispatch) OPT_CLEANUP_DISPATCH=true ;;
+            *)
+              log WARN "Unknown report_action '${REPORT_ACTION}', falling back to legacy inputs"
+              REPORT_ACTION=""
+              ;;
+          esac
+        fi
+
+        if [ -z "$REPORT_ACTION" ]; then
+          if [ "$FULL_REPORT" = "true" ]; then
+            OPT_STALE_AGE=true
+            OPT_PR_STATUS=true
+            OPT_DIFF_LINKS=true
+            OPT_BEHIND_MAIN=true
+            OPT_CLEANUP_DISPATCH=true
+          else
+            OPT_STALE_AGE="${{ inputs.stale_branch_age }}"
+            OPT_PR_STATUS="${{ inputs.pr_status }}"
+            OPT_DIFF_LINKS="${{ inputs.diff_links }}"
+            OPT_BEHIND_MAIN="${{ inputs.behind_main }}"
+            OPT_CLEANUP_DISPATCH="${{ inputs.cleanup_dispatch }}"
+          fi
         fi
 
         BEHIND_THRESHOLD="${{ inputs.behind_threshold }}"
