@@ -10,10 +10,15 @@ on:
   workflow_dispatch:
     inputs:
       org_name:
-        description: "Account or org to report on (blank = this repo's owner)"
+        description: "Account or org to report on"
         required: false
-        type: string
-        default: ""
+        type: choice
+        default: aleon1220
+        options:
+          - aleon1220
+          - LearningSandboxNZ
+          - secore-ai
+          - spinnaker-hackathon
       report_action:
         description: "Single report operation to run"
         required: false
@@ -30,8 +35,13 @@ on:
       behind_threshold:
         description: "Conflict risk threshold (commits behind main)"
         required: false
-        type: number
-        default: 10
+        type: choice
+        default: "10"
+        options:
+          - "5"
+          - "10"
+          - "20"
+          - "50"
       debug:
         description: "Enable debug logging"
         required: false

@@ -68,13 +68,13 @@ backward compatibility.
 
 | Legacy reusable-workflow input | Adds to the report |
 | --- | --- |
-| `org_name` | User or org to report on. Blank means this repo's owner (`aleon1220`). See [Token and access](#token-and-access) |
+| `org_name` | User or org to report on (`aleon1220`, `LearningSandboxNZ`, `secore-ai`, `spinnaker-hackathon`; defaults to `aleon1220` in manual runs, or blank for this repo's owner in reusable runs). See [Token and access](#token-and-access) |
 | `report_only_open_prs` | Limits the report to branches with an open PR |
 | `stale_branch_age` | Time since the last commit with a status: 🟢 Active (under 14 days), 🟡 Stale (14–30 days), 🔴 Abandoned (over 30 days) |
 | `pr_status` | The branch's PR with a direct link and status: 🔀 Open (✅ approved, ❌ changes requested or 👀 awaiting review), 📝 Draft, 🟣 Merged, 🚫 Closed. An open PR takes priority over older PRs. Branches without a PR show ➕ with a link to create one |
 | `diff_links` | A one-click `main...branch` compare link |
 | `behind_main` | How far each branch is behind its default branch, rated Low, ⚠️ High (over the threshold) or 🚨 Very high (over 5× the threshold). Branches with no new commits have no conflict risk. Flagged branches get a ready-to-run sync command under Recommended Next Steps |
-| `behind_threshold` | Commits behind the default branch before a branch counts as high risk (default `10`) |
+| `behind_threshold` | Commits behind the default branch before a branch counts as high risk (`5`, `10`, `20`, `50` in manual runs; default `10`) |
 | `cleanup_dispatch` | Ready-to-run `gh api` delete commands for merged or empty branches from previous months |
 
 The cleanup and sync commands are only printed, not run. Run them as an account with
