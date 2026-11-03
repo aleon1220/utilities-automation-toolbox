@@ -606,6 +606,7 @@ runs:
         set -Eeuo pipefail
         REPOS_MERGED_CHECKED=0
         TREND_MONTHS=6
+        TREND_WEEKS=6
 
         log INFO "Phase 4: Starting merge history and main branch activity collection"
         MERGE_FILE="$RUNNER_TEMP/merge_history.txt"
@@ -621,12 +622,26 @@ runs:
         done
         printf "%s\n" "${MONTHS[@]}" > "$RUNNER_TEMP/trend_months.txt"
 
-        # One GraphQL query per repo: last commit on the default branch, commits per month, open PRs
+        TODAY=$(date -u +%Y-%m-%d)
+        DAYS_FROM_MONDAY=$(($(date -u -d "$TODAY" +%u) - 1))
+        CURRENT_MONDAY=$(date -u -d "$TODAY -${DAYS_FROM_MONDAY} days" +%Y-%m-%d)
+        WEEKS=()
+        for ((i = TREND_WEEKS - 1; i >= 0; i--)); do
+          WEEKS+=("$(date -u -d "$CURRENT_MONDAY -${i} weeks" +%Y-%m-%d)")
+        done
+        printf "%s\n" "${WEEKS[@]}" > "$RUNNER_TEMP/trend_weeks.txt"
+
+        # One GraphQL query per repo: last commit on the default branch, monthly and weekly history, open PRs
         HISTORY_FIELDS=""
         for i in "${!MONTHS[@]}"; do
           SINCE="${MONTHS[$i]}-01T00:00:00Z"
           UNTIL=$(date -u -d "${MONTHS[$i]}-01 +1 month" +%Y-%m-01T00:00:00Z)
           HISTORY_FIELDS+=" m${i}: history(since: \"${SINCE}\", until: \"${UNTIL}\") { totalCount }"
+        done
+        for i in "${!WEEKS[@]}"; do
+          SINCE="${WEEKS[$i]}T00:00:00Z"
+          UNTIL=$(date -u -d "${WEEKS[$i]} +7 days" +%Y-%m-%dT%H:%M:%SZ)
+          HISTORY_FIELDS+=" w${i}: history(since: \"${SINCE}\", until: \"${UNTIL}\") { totalCount }"
         done
         MAIN_QUERY="query(\$owner: String!, \$name: String!, \$base: String!) {
           repository(owner: \$owner, name: \$name) {
@@ -638,7 +653,8 @@ runs:
         MAIN_JQ='.data.repository as $r | ($r.defaultBranchRef.target // {}) as $t
           | [($t.committedDate // ""),
              ($r.pullRequests.totalCount // 0 | tostring),
-             ([range(0; '"${TREND_MONTHS}"')] | map($t["m\(.)"].totalCount // 0 | tostring) | join(","))]
+             ([range(0; '"${TREND_MONTHS}"')] | map($t["m\(.)"].totalCount // 0 | tostring) | join(",")),
+             ([range(0; '"${TREND_WEEKS}"')] | map($t["w\(.)"].totalCount // 0 | tostring) | join(","))]
           | join("|")'
 
         while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
@@ -659,7 +675,7 @@ runs:
 
           # Main branch activity
           MAIN_ROW=$(gh api graphql -f query="$MAIN_QUERY" -f owner="$ORG_NAME" -f name="$REPO" -f base="$DEFAULT_BRANCH" --jq "$MAIN_JQ" 2>/dev/null || echo "")
-          IFS='|' read -r LAST_COMMIT OPEN_PRS COUNTS <<< "${MAIN_ROW:-||}"
+          IFS='|' read -r LAST_COMMIT OPEN_PRS COUNTS WEEK_COUNTS <<< "${MAIN_ROW:-|||}"
           if [ -z "$MAIN_ROW" ]; then
             log WARN "Phase 4: Could not read ${DEFAULT_BRANCH} activity for ${REPO}"
           fi
@@ -681,8 +697,8 @@ runs:
             fi
           fi
 
-          log INFO "Phase 4: ${REPO} ${DEFAULT_BRANCH} activity=${ACTIVITY} last_commit=${LAST_COMMIT:-none} commits_by_month=${COUNTS:-n/a} open_prs=${OPEN_PRS:-n/a}"
-          echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${LAST_COMMIT}|${DAYS_SINCE}|${ACTIVITY}|${OPEN_PRS:-0}|${TOTAL}|${COUNTS}|${LAST_MERGED}" >> "$MAIN_FILE"
+          log INFO "Phase 4: ${REPO} ${DEFAULT_BRANCH} activity=${ACTIVITY} last_commit=${LAST_COMMIT:-none} commits_by_month=${COUNTS:-n/a} commits_by_week=${WEEK_COUNTS:-n/a} open_prs=${OPEN_PRS:-n/a}"
+          echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${LAST_COMMIT}|${DAYS_SINCE}|${ACTIVITY}|${OPEN_PRS:-0}|${TOTAL}|${COUNTS}|${LAST_MERGED}|${WEEK_COUNTS:-}" >> "$MAIN_FILE"
         done < "$RUNNER_TEMP/repos_metadata.txt"
 
         echo "repos_checked=${REPOS_MERGED_CHECKED}" >> "$GITHUB_OUTPUT"
@@ -737,7 +753,9 @@ runs:
         : > "$SECTION_FILE"
         [ -s "$MAIN_FILE" ] || { log WARN "No main branch activity collected"; exit 0; }
         mapfile -t MONTHS < "$RUNNER_TEMP/trend_months.txt"
+        mapfile -t WEEKS < "$RUNNER_TEMP/trend_weeks.txt"
         N_MONTHS=${#MONTHS[@]}
+        N_WEEKS=${#WEEKS[@]}
 
         # Per-row sparkline scaled to the row's own peak; "·" = no commits that month
         sparkline() {
@@ -764,13 +782,15 @@ runs:
         # Totals across all repos
         declare -A ACT_COUNT=([active]=0 [quiet]=0 [dormant]=0 [unknown]=0)
         MONTH_TOTALS=()
+        WEEK_TOTALS=()
         for ((i = 0; i < N_MONTHS; i++)); do MONTH_TOTALS+=(0); done
+        for ((i = 0; i < N_WEEKS; i++)); do WEEK_TOTALS+=(0); done
         OPEN_PRS_TOTAL=0
         REPO_COUNT=0
         ROWS_FILE="$RUNNER_TEMP/main_rows.txt"
         : > "$ROWS_FILE"
 
-        while IFS='|' read -r REPO BRANCH VIS LAST_COMMIT DAYS ACTIVITY OPEN_PRS TOTAL COUNTS LAST_MERGED; do
+        while IFS='|' read -r REPO BRANCH VIS LAST_COMMIT DAYS ACTIVITY OPEN_PRS TOTAL COUNTS LAST_MERGED WEEK_COUNTS; do
           [ -z "$REPO" ] && continue
           REPO_COUNT=$((REPO_COUNT + 1))
           ACT_COUNT[$ACTIVITY]=$(( ${ACT_COUNT[$ACTIVITY]:-0} + 1 ))
@@ -779,10 +799,14 @@ runs:
           for i in "${!COUNT_LIST[@]}"; do
             MONTH_TOTALS[$i]=$(( MONTH_TOTALS[$i] + ${COUNT_LIST[$i]:-0} ))
           done
+          IFS=',' read -r -a WEEK_COUNT_LIST <<< "$WEEK_COUNTS"
+          for i in "${!WEEK_COUNT_LIST[@]}"; do
+            WEEK_TOTALS[$i]=$(( WEEK_TOTALS[$i] + ${WEEK_COUNT_LIST[$i]:-0} ))
+          done
           # Sort key: active/quiet first (most commits, then most recent), dormant/unknown after
           GROUP=0
           case "$ACTIVITY" in dormant|unknown) GROUP=1 ;; esac
-          echo "${GROUP}|${TOTAL:-0}|${DAYS:-99999}|${REPO}|${BRANCH}|${LAST_COMMIT}|${DAYS}|${ACTIVITY}|${OPEN_PRS:-0}|${COUNTS}|${LAST_MERGED}" >> "$ROWS_FILE"
+          echo "${GROUP}|${TOTAL:-0}|${DAYS:-99999}|${REPO}|${BRANCH}|${LAST_COMMIT}|${DAYS}|${ACTIVITY}|${OPEN_PRS:-0}|${COUNTS}|${LAST_MERGED}|${WEEK_COUNTS:-}" >> "$ROWS_FILE"
         done < "$MAIN_FILE"
         sort -t'|' -k1,1n -k2,2nr -k3,3n -o "$ROWS_FILE" "$ROWS_FILE"
 
@@ -794,6 +818,18 @@ runs:
         done
         X_AXIS=$(printf '"%s", ' "${MONTHS[@]}"); X_AXIS="[${X_AXIS%, }]"
         SERIES=$(printf '%s, ' "${MONTH_TOTALS[@]}"); SERIES="[${SERIES%, }]"
+        WEEK_PEAK=1
+        for t in "${WEEK_TOTALS[@]}"; do
+          if [ "$t" -gt "$WEEK_PEAK" ]; then WEEK_PEAK="$t"; fi
+        done
+        WEEK_X_AXIS=""
+        WEEK_X_LABELS=()
+        for week in "${WEEKS[@]}"; do
+          ISO_WEEK=$(date -u -d "$week" +%G-W%V)
+          WEEK_X_LABELS+=("${ISO_WEEK}, ${week} Monday")
+        done
+        WEEK_X_AXIS=$(printf '"%s", ' "${WEEK_X_LABELS[@]}"); WEEK_X_AXIS="[${WEEK_X_AXIS%, }]"
+        WEEK_SERIES=$(printf '%s, ' "${WEEK_TOTALS[@]}"); WEEK_SERIES="[${WEEK_SERIES%, }]"
 
         table_header() {
           echo "| Repo | Branch | Activity | Last commit | Trend (${MONTHS[0]} → ${MONTHS[$((N_MONTHS - 1))]}) | Commits | Open PRs | Last merged PR |"
@@ -827,6 +863,17 @@ runs:
           echo "    line ${SERIES}"
           echo '```'
           echo ""
+          echo "### Commits to default branches by week, all repos"
+          echo ""
+          echo '```mermaid'
+          echo "xychart-beta"
+          echo "    title \"Commits to default branches by week, all repos\""
+          echo "    x-axis ${WEEK_X_AXIS}"
+          echo "    y-axis \"Commits\" 0 --> ${WEEK_PEAK}"
+          echo "    bar ${WEEK_SERIES}"
+          echo "    line ${WEEK_SERIES}"
+          echo '```'
+          echo ""
 
           # Share of commits per repo: top 8, the rest grouped
           if [ "$WINDOW_TOTAL" -gt 0 ]; then
@@ -850,7 +897,7 @@ runs:
           fi
 
           table_header
-          while IFS='|' read -r GROUP TOTAL _ REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED; do
+          while IFS='|' read -r GROUP TOTAL _ REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED WEEK_COUNTS; do
             if [ "$GROUP" = "0" ]; then
               table_row "$REPO" "$BRANCH" "$LAST" "$DAYS" "$ACTIVITY" "$PRS" "$COUNTS" "$MERGED" "$TOTAL"
             fi
@@ -862,7 +909,7 @@ runs:
             echo "<details><summary>💤 ${IDLE_COUNT} dormant or unknown repos</summary>"
             echo ""
             table_header
-            while IFS='|' read -r GROUP TOTAL _ REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED; do
+            while IFS='|' read -r GROUP TOTAL _ REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED WEEK_COUNTS; do
               if [ "$GROUP" = "1" ]; then
                 table_row "$REPO" "$BRANCH" "$LAST" "$DAYS" "$ACTIVITY" "$PRS" "$COUNTS" "$MERGED" "$TOTAL"
               fi
@@ -1035,9 +1082,10 @@ runs:
         touch "$MAIN_FILE" "$BRANCHES_RAW_FILE"
         GENERATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         MONTHS_JSON=$(jq -R . "$RUNNER_TEMP/trend_months.txt" | jq -s -c .)
+        WEEKS_JSON=$(jq -R . "$RUNNER_TEMP/trend_weeks.txt" | jq -s -c .)
 
         # Raw data -> JSON (pipe-delimited files written by phases 3 and 4)
-        jq -R -s -c --argjson months "$MONTHS_JSON" '
+        jq -R -s -c --argjson months "$MONTHS_JSON" --argjson weeks "$WEEKS_JSON" '
           split("\n") | map(select(length > 0) | split("|")) | map({
             repo: .[0], default_branch: .[1], visibility: .[2],
             last_commit_at: (if .[3] == "" then null else .[3] end),
@@ -1046,6 +1094,8 @@ runs:
             open_prs_to_default: (.[6] | tonumber? // 0),
             commits_in_window: (.[7] | tonumber? // 0),
             commits_by_month: ([$months, (.[8] // "" | split(","))] | transpose
+              | map(select(.[0] != null) | {(.[0]): (.[1] // "0" | tonumber? // 0)}) | add // {}),
+            commits_by_week: ([$weeks, (.[10] // "" | split(","))] | transpose
               | map(select(.[0] != null) | {(.[0]): (.[1] // "0" | tonumber? // 0)}) | add // {}),
             last_pr_merged_at: (if .[9] == "" or .[9] == "none" then null else .[9] end)
           })' "$MAIN_FILE" > "$REPORT_DIR/main_branches.json"
@@ -1077,6 +1127,13 @@ runs:
           (.[] | . as $r | .commits_by_month | to_entries[] | [$date, $owner, $r.repo, $r.default_branch, .key, .value])
           | @csv' "$REPORT_DIR/main_branches.json" > "$REPORT_DIR/main_commits_monthly.csv"
 
+        jq -r --arg date "${GENERATED_AT:0:10}" --arg owner "$ORG_NAME" '
+          ["report_date","owner","repo","default_branch","week_start_monday","week","commits"],
+          (.[] | . as $r | .commits_by_week | to_entries[] |
+            [$date, $owner, $r.repo, $r.default_branch, .key,
+             (.key | strptime("%Y-%m-%d") | mktime | strftime("%G-W%V")), .value])
+          | @csv' "$REPORT_DIR/main_branches.json" > "$REPORT_DIR/main_commits_weekly.csv"
+
         jq -r '
           ["repo","default_branch","branch","from_previous_month","ahead_by","behind_by",
            "last_commit_at","pr_number","pr_state","conflict_risk"],
@@ -1091,6 +1148,7 @@ runs:
           --arg run_id "${GITHUB_RUN_ID}" \
           --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
           --argjson months "$MONTHS_JSON" \
+          --argjson weeks "$WEEKS_JSON" \
           --argjson options "$(jq -n \
             --arg full_report "${FULL_REPORT:-false}" --arg only_open_prs "${OPT_ONLY_OPEN_PRS:-false}" \
             --arg stale_branch_age "${OPT_STALE_AGE:-false}" --arg pr_status "${OPT_PR_STATUS:-false}" \
@@ -1105,11 +1163,13 @@ runs:
             run: {id: $run_id, url: $run_url},
             options: $options,
             trend_months: $months,
+            trend_weeks: $weeks,
             totals: {
               repos: ($r | length),
               main_activity: ({active: 0, quiet: 0, dormant: 0, unknown: 0}
                 + ($r | group_by(.activity) | map({(.[0].activity): length}) | add // {})),
               main_commits_by_month: ($months | map(. as $m | {($m): ($r | map(.commits_by_month[$m] // 0) | add // 0)}) | add // {}),
+              main_commits_by_week: ($weeks | map(. as $w | {($w): ($r | map(.commits_by_week[$w] // 0) | add // 0)}) | add // {}),
               open_prs_to_default: ($r | map(.open_prs_to_default) | add // 0),
               repos_with_improvement_branches: ($b | map(.repo) | unique | length),
               improvement_branches: ($b | length),
