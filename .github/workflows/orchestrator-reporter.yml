@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       org_name:
-        description: "Account or org to report on"
+        description: "Account or org to report on ('all' = personal account + all orgs)"
         required: false
         type: choice
         default: aleon1220
@@ -19,6 +19,7 @@ on:
           - LearningSandboxNZ
           - secore-ai
           - spinnaker-hackathon
+          - all
       report_action:
         description: "Single report operation to run"
         required: false
@@ -53,7 +54,7 @@ on:
   workflow_call:
     inputs:
       org_name:
-        description: "Account or org to report on (blank = this repo's owner)"
+        description: "Account(s) or org(s) to report on: single owner, comma-separated list, or 'all' (blank = this repo's owner)"
         required: false
         type: string
         default: ""

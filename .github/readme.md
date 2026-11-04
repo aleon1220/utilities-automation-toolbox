@@ -30,24 +30,25 @@ Shared helpers live in [scripts/](scripts/). [logging.sh](scripts/logging.sh) pr
 
 ## Repos Reporter
 
-Every run covers all non-archived repos of one user or org and always includes:
+Every run covers all non-archived repos of one or more users/orgs (including `all` to report across `aleon1220`, `LearningSandboxNZ`, `secore-ai` and `spinnaker-hackathon` in a single run) and includes:
 
+- **Multi-Owner Overview** (when reporting on multiple owners): a consolidated table and Mermaid chart breaking down repos, ✨ Active / 🌙 Quiet / 💤 Dormant counts, 6-month trend sparklines, 6-month and 6-week default-branch commits, open PRs and improvement branches per personal account or org, while unified tables and exports qualify repositories as `owner/repo`.
 - **Main branches across all repos**: how many repos are ✨ Active (commit on the default
   branch in the last 30 days), 🌙 Quiet (31–90 days) or 💤 Dormant (over 90 days), plus
   Mermaid charts of commits to default branches per month (last 6 months), per week
   (last 6 ISO weeks, Monday–Sunday UTC) and each repo's share. A table per repo shows a
   monthly trend sparkline, commit count, open PRs and the last merged PR. Dormant repos are
   folded away.
-- **Report data artifact** (`repos-report-<owner>`, kept 90 days), linked at the bottom of the
+- **Report data artifact** (`repos-report-<owner>` or `repos-report-all`, kept 90 days), linked at the bottom of the
   summary:
 
   | File | Contents |
   | --- | --- |
-  | `summary.json` | Run metadata, options and aggregated totals (activity counts, commits per month and week, open PRs, branches at conflict risk) |
-  | `main_branches.json` / `.csv` | One row per repo: default branch, last commit, activity, open PRs, last merged PR, commits per month (`commits_by_week` also in JSON) |
+  | `summary.json` | Run metadata, `owners` list, options, aggregated `totals` and per-owner `by_owner` breakdown (activity counts, commits per month and week, open PRs, branches at conflict risk) |
+  | `main_branches.json` / `.csv` | One row per repo (`owner`, `repo`, default branch, last commit, activity, open PRs, last merged PR, commits per month; `commits_by_week` also in JSON) |
   | `main_commits_monthly.csv` | One row per repo per month, stamped with the report date, ready for spreadsheets or BI trend charts |
   | `main_commits_weekly.csv` | One row per repo per ISO week (Monday UTC start), stamped with the report date, for short-term velocity trends |
-  | `improvement_branches.json` / `.csv` | One row per improvement branch: ahead/behind, last commit, PR number and state, conflict risk |
+  | `improvement_branches.json` / `.csv` | One row per improvement branch (`owner`, `repo`, ahead/behind, last commit, PR number and state, conflict risk) |
   | `report.md` | A copy of the job summary |
 
 ### Options
@@ -68,7 +69,7 @@ backward compatibility.
 
 | Legacy reusable-workflow input | Adds to the report |
 | --- | --- |
-| `org_name` | User or org to report on (`aleon1220`, `LearningSandboxNZ`, `secore-ai`, `spinnaker-hackathon`; defaults to `aleon1220` in manual runs, or blank for this repo's owner in reusable runs). See [Token and access](#token-and-access) |
+| `org_name` | User(s) or org(s) to report on (`aleon1220`, `LearningSandboxNZ`, `secore-ai`, `spinnaker-hackathon`, `all`, or a comma-separated list in reusable runs; defaults to `aleon1220` in manual runs, or blank for this repo's owner in reusable runs). See [Token and access](#token-and-access) |
 | `report_only_open_prs` | Limits the report to branches with an open PR |
 | `stale_branch_age` | Time since the last commit with a status: 🟢 Active (under 14 days), 🟡 Stale (14–30 days), 🔴 Abandoned (over 30 days) |
 | `pr_status` | The branch's PR with a direct link and status: 🔀 Open (✅ approved, ❌ changes requested or 👀 awaiting review), 📝 Draft, 🟣 Merged, 🚫 Closed. An open PR takes priority over older PRs. Branches without a PR show ➕ with a link to create one |
@@ -105,19 +106,18 @@ and how many public and private repos it can see in the target, and warns about 
 Roadmap for the Repos Reporter. ✅ items are done and can be turned on with the input
 shown. ⬜ items are planned.
 
-### Done
-
 - ✅ **Stale Branch Age Tracking** (`stale_branch_age`): Show time since the last commit on each improvement branch to highlight abandoned branches.
 - ✅ **Automated PR Status & Direct Links** (`pr_status`): Check if an open PR exists for each improvement branch, with direct links and status indicators.
 - ✅ **Direct Diff & Comparison Deep-Links** (`diff_links`): Include one-click GitHub comparison links (`main...branch`) for quick diff inspection.
 - ✅ **Behind-Main & Conflict Risk Indicators** (`behind_main`, `behind_threshold`): Flag branches that are significantly behind the default branch (`behind_by > 10` by default) to preempt merge conflicts.
 - ✅ **Interactive Automated Cleanup Dispatch** (`cleanup_dispatch`): List merged or obsolete improvement branches from previous months with delete commands.
-- ✅ **Report Artifact Export (JSON/CSV)** (always on): Export raw and aggregated metrics as downloadable workflow artifacts for historical tracking and trend analysis.
-- ✅ **Main Branch Trend Across Repos** (always on): Chart monthly commits to every repo's default branch, with per-repo activity and trend.
+- ✅ **Report Artifact Export (JSON/CSV)** (always on): Export raw and aggregated metrics (including monthly and weekly commit series) as downloadable workflow artifacts for historical tracking and trend analysis.
+- ✅ **Main Branch Trend Across Repos** (always on): Chart monthly (last 6 months) and weekly (last 6 ISO weeks) commits to every repo's default branch, with per-repo activity and trend.
+- ✅ **Dropdown Dispatch Controls** (`report_action`, `org_name`, `behind_threshold`): Select the report operation, target account or org, and conflict-risk threshold from `workflow_dispatch` dropdown menus without manual text entry.
+- ✅ **Multi-Owner Reports** (`org_name=all` or comma-separated owners): Report on a personal account and several orgs in a single run, with a consolidated **Multi-Owner Overview** section and `owner/repo` unified tables and exports.
 
 ### Planned
 
-- ⬜ **Multi-Owner Reports**: Report on a personal account and several orgs in a single run.
 - ⬜ **Cross-Run History**: Read previous runs' `summary.json` artifacts to chart improvement-branch and conflict-risk trends over time.
 - ⬜ **Faster Data Collection with Batched GraphQL**: Fetch branches, comparisons, PRs and last commits in a few batched GraphQL queries instead of several REST calls per branch (the compare endpoint is currently called twice per branch), to cut run time and API rate-limit use.
 - ⬜ **Reporter Test Suite in CI**: Run the report steps against fixture data with a stubbed `gh`, check the generated summary, CSV and JSON, and validate the Mermaid diagrams on every PR that touches `.github/`.

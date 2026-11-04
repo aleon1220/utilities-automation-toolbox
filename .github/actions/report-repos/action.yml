@@ -10,8 +10,12 @@ inputs:
     required: false
     default: "-improvements$"
   org_name:
-    description: "Organization name"
+    description: "Organization or user name(s): single owner, comma-separated list, or 'all'"
     required: true
+  default_owners:
+    description: "Comma-separated owners used when org_name is 'all'"
+    required: false
+    default: "aleon1220,LearningSandboxNZ,secore-ai,spinnaker-hackathon"
   gh_token:
     description: "GitHub token"
     required: true
@@ -141,6 +145,36 @@ runs:
           else echo "$((d / 365)) years ago"
           fi
         }
+        # Per-row sparkline scaled to the row's own peak; "·" = no commits that month
+        sparkline() {
+          local -a counts bars=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █)
+          local c max=0 out=""
+          IFS=',' read -r -a counts <<< "$1"
+          for c in "${counts[@]}"; do
+            if [ "${c:-0}" -gt "$max" ]; then max="$c"; fi
+          done
+          for c in "${counts[@]}"; do
+            if [ "${c:-0}" -eq 0 ]; then out+="·"; else out+="${bars[$(( c * 7 / max ))]}"; fi
+          done
+          echo "${out:-–}"
+        }
+        activity_label() {
+          case "$1" in
+            active) echo "✨ Active" ;;
+            quiet) echo "🌙 Quiet" ;;
+            dormant) echo "💤 Dormant" ;;
+            *) echo "❔ Unknown" ;;
+          esac
+        }
+        # Display "owner/repo" in multi-owner runs and "repo" in single-owner runs
+        repo_label() {
+          local owner="$1" repo="$2"
+          if [ "${MULTI_OWNER:-false}" = "true" ]; then
+            echo "${owner}/${repo}"
+          else
+            echo "${repo}"
+          fi
+        }
         EOF
         echo "BASH_ENV=$ENV_FILE" >> "$GITHUB_ENV"
         echo "Created a shared bash init file sourced automatically by all subsequent bash steps"
@@ -207,7 +241,40 @@ runs:
           BEHIND_THRESHOLD=10
         fi
 
+        RAW_ORG_NAME="${{ inputs.org_name }}"
+        DEFAULT_OWNERS="${{ inputs.default_owners }}"
+        if [ "$RAW_ORG_NAME" = "all" ]; then
+          RESOLVED_OWNERS_RAW="$DEFAULT_OWNERS"
+        else
+          RESOLVED_OWNERS_RAW="$RAW_ORG_NAME"
+        fi
+
+        OWNERS_LIST=()
+        IFS=$', \t\n' read -r -a RAW_ARR <<< "$RESOLVED_OWNERS_RAW"
+        for item in "${RAW_ARR[@]}"; do
+          [ -z "$item" ] && continue
+          already=false
+          for existing in "${OWNERS_LIST[@]:-}"; do
+            if [ "$existing" = "$item" ]; then already=true; break; fi
+          done
+          [ "$already" = false ] && OWNERS_LIST+=("$item")
+        done
+        printf "%s\n" "${OWNERS_LIST[@]}" > "$RUNNER_TEMP/owners.txt"
+        OWNER_COUNT=${#OWNERS_LIST[@]}
+        MULTI_OWNER=false
+        [ "$OWNER_COUNT" -gt 1 ] && MULTI_OWNER=true
+        OWNERS_CSV=$(IFS=','; echo "${OWNERS_LIST[*]}")
+        OWNERS_DISPLAY=$(IFS=', '; echo "${OWNERS_LIST[*]}")
+        if [ "$OWNER_COUNT" -eq 1 ]; then
+          ARTIFACT_SLUG="${OWNERS_LIST[0]}"
+        elif [ "$RAW_ORG_NAME" = "all" ]; then
+          ARTIFACT_SLUG="all"
+        else
+          ARTIFACT_SLUG="multi-owner"
+        fi
+
         log INFO "Resolved reporting options:"
+        log INFO "  owners=$OWNERS_DISPLAY (count=$OWNER_COUNT, multi_owner=$MULTI_OWNER)"
         log INFO "  full_report=$FULL_REPORT"
         log INFO "  report_only_open_prs=$ONLY_OPEN"
         log INFO "  stale_branch_age=$OPT_STALE_AGE"
@@ -225,19 +292,35 @@ runs:
         echo "OPT_BEHIND_MAIN=$OPT_BEHIND_MAIN" >> "$GITHUB_ENV"
         echo "OPT_BEHIND_THRESHOLD=$BEHIND_THRESHOLD" >> "$GITHUB_ENV"
         echo "OPT_CLEANUP_DISPATCH=$OPT_CLEANUP_DISPATCH" >> "$GITHUB_ENV"
+        echo "MULTI_OWNER=$MULTI_OWNER" >> "$GITHUB_ENV"
+        echo "OWNER_COUNT=$OWNER_COUNT" >> "$GITHUB_ENV"
+        echo "OWNERS_CSV=$OWNERS_CSV" >> "$GITHUB_ENV"
+        echo "OWNERS_DISPLAY=$OWNERS_DISPLAY" >> "$GITHUB_ENV"
+        echo "artifact_slug=$ARTIFACT_SLUG" >> "$GITHUB_OUTPUT"
 
     - name: List repositories
       id: list
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
-        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         # log is available via BASH_ENV
-        log INFO "Listing non-archived repositories for ${ORG_NAME}"
-        REPOS=$(gh repo list "$ORG_NAME" --limit 1000 --no-archived --json name --jq '.[].name')
-        # Write raw list (may include empty if org has zero)
-        printf "%s\n" "$REPOS" > "$RUNNER_TEMP/repos_all.txt"
+        : > "$RUNNER_TEMP/repos_all.txt"
+        : > "$RUNNER_TEMP/owner_repo_counts.txt"
+        while IFS= read -r OWNER; do
+          [ -z "$OWNER" ] && continue
+          log INFO "Listing non-archived repositories for ${OWNER}"
+          OWNER_TYPE=$(gh api "users/${OWNER}" --jq '.type' 2>/dev/null || echo "Unknown")
+          REPOS=$(gh repo list "$OWNER" --limit 1000 --no-archived --json name --jq '.[].name' 2>/dev/null || echo "")
+          O_COUNT=0
+          while IFS= read -r R; do
+            [ -z "$R" ] && continue
+            echo "${OWNER}/${R}" >> "$RUNNER_TEMP/repos_all.txt"
+            O_COUNT=$((O_COUNT + 1))
+          done <<< "$REPOS"
+          echo "${OWNER}|${OWNER_TYPE}|${O_COUNT}" >> "$RUNNER_TEMP/owner_repo_counts.txt"
+          log INFO "Repositories returned for ${OWNER} (${OWNER_TYPE}): ${O_COUNT}"
+        done < "$RUNNER_TEMP/owners.txt"
         ALL_COUNT=$(sed '/^\s*$/d' "$RUNNER_TEMP/repos_all.txt" | wc -l | tr -d ' ')
         log INFO "Total repositories returned: ${ALL_COUNT}"
         echo "all_count=${ALL_COUNT}" >> "$GITHUB_OUTPUT"
@@ -289,7 +372,6 @@ runs:
       if: steps.enumerate.outputs.status == 'has_repos'
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
-        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         set -Eeuo pipefail
@@ -299,28 +381,28 @@ runs:
         METADATA_FILE="$RUNNER_TEMP/repos_metadata.txt"
         : > "$METADATA_FILE"
 
-        while IFS= read -r REPO; do
-          [ -z "$REPO" ] && continue
+        while IFS='/' read -r OWNER REPO; do
+          [ -z "$OWNER" ] || [ -z "$REPO" ] && continue
           # FIX: Replaced post-increment to prevent exit code 1 when value is 0
           REPOS_PROCESSED=$((REPOS_PROCESSED + 1))
-          log INFO "Phase 1: Processing repository #${REPOS_PROCESSED}: ${REPO}"
+          log INFO "Phase 1: Processing repository #${REPOS_PROCESSED}: ${OWNER}/${REPO}"
 
-          log DEBUG "Phase 1: Fetching metadata for ${REPO}"
-          DEFAULT_BRANCH=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.default_branch' 2>/dev/null || echo "")
+          log DEBUG "Phase 1: Fetching metadata for ${OWNER}/${REPO}"
+          DEFAULT_BRANCH=$(gh api "repos/${OWNER}/${REPO}" --jq '.default_branch' 2>/dev/null || echo "")
           
           if [ -z "$DEFAULT_BRANCH" ]; then
-            log ERROR "Phase 1: Failed to fetch default branch for ${REPO}. Skipping."
+            log ERROR "Phase 1: Failed to fetch default branch for ${OWNER}/${REPO}. Skipping."
             continue
           fi
 
-          VISIBILITY=$(gh api "repos/${ORG_NAME}/${REPO}" --jq '.visibility' 2>/dev/null || echo "")
-          log INFO "Phase 1: Repository ${REPO} - branch=${DEFAULT_BRANCH} visibility=${VISIBILITY}"
+          VISIBILITY=$(gh api "repos/${OWNER}/${REPO}" --jq '.visibility' 2>/dev/null || echo "")
+          log INFO "Phase 1: Repository ${OWNER}/${REPO} - branch=${DEFAULT_BRANCH} visibility=${VISIBILITY}"
 
           if [ "$DEFAULT_BRANCH" != "main" ]; then
-            log WARN "Phase 1: Repository ${REPO} uses non-standard default branch: ${DEFAULT_BRANCH}"
+            log WARN "Phase 1: Repository ${OWNER}/${REPO} uses non-standard default branch: ${DEFAULT_BRANCH}"
           fi
 
-          echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}" >> "$METADATA_FILE"
+          echo "${OWNER}|${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}" >> "$METADATA_FILE"
         done < "$RUNNER_TEMP/repos.txt"
 
         log INFO "Phase 1 completed: ${REPOS_PROCESSED} repositories processed"
@@ -331,7 +413,6 @@ runs:
       if: steps.enumerate.outputs.status == 'has_repos'
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
-        ORG_NAME: ${{ inputs.org_name }}
         BRANCH_PATTERN: ${{ inputs.branch_pattern }}
       shell: bash
       run: |
@@ -346,14 +427,14 @@ runs:
         : > "$PREV_MONTH_REPOS_FILE"
         CURRENT_YM=$(date +%Y-%m)
 
-        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
+        while IFS='|' read -r OWNER REPO DEFAULT_BRANCH VISIBILITY; do
           [ -z "$REPO" ] && continue
           REPOS_CHECKED=$((REPOS_CHECKED + 1))
-          log DEBUG "Phase 2: Fetching branches for ${REPO}"
+          log DEBUG "Phase 2: Fetching branches for ${OWNER}/${REPO}"
 
-          ALL_BRANCHES=$(gh api "repos/${ORG_NAME}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
+          ALL_BRANCHES=$(gh api "repos/${OWNER}/${REPO}/branches?per_page=100" --paginate --jq '.[].name' 2>/dev/null || echo "")
           BRANCH_COUNT=$(printf "%s\n" "$ALL_BRANCHES" | sed '/^\s*$/d' | wc -l | tr -d ' ')
-          log INFO "Phase 2: Repository ${REPO} has ${BRANCH_COUNT} total branches"
+          log INFO "Phase 2: Repository ${OWNER}/${REPO} has ${BRANCH_COUNT} total branches"
 
           if [ -n "${BRANCH_PATTERN:-}" ]; then
             IMPROVEMENT_BRANCHES=$(printf "%s\n" "$ALL_BRANCHES" | grep -E -- "${BRANCH_PATTERN}" || true)
@@ -362,7 +443,7 @@ runs:
           fi
 
           if [ -z "$IMPROVEMENT_BRANCHES" ]; then
-            log DEBUG "Phase 2: No improvement branches found in ${REPO} for pattern: ${BRANCH_PATTERN}"
+            log DEBUG "Phase 2: No improvement branches found in ${OWNER}/${REPO} for pattern: ${BRANCH_PATTERN}"
           else
             REPO_HAS_IMPROVEMENTS=false
             while read -r BR; do
@@ -370,9 +451,9 @@ runs:
 
               # If report_only_open_prs is active, skip branches without an open PR
               if [ "${OPT_ONLY_OPEN_PRS:-false}" = "true" ]; then
-                OPEN_PR_NUM=$(gh pr list -R "${ORG_NAME}/${REPO}" -H "${BR}" --state open --limit 1 --json number --jq '.[0].number' 2>/dev/null || echo "")
+                OPEN_PR_NUM=$(gh pr list -R "${OWNER}/${REPO}" -H "${BR}" --state open --limit 1 --json number --jq '.[0].number' 2>/dev/null || echo "")
                 if [ -z "$OPEN_PR_NUM" ]; then
-                  log DEBUG "Phase 2: Skipping ${BR} in ${REPO} (report_only_open_prs is active and no open PR exists)"
+                  log DEBUG "Phase 2: Skipping ${BR} in ${OWNER}/${REPO} (report_only_open_prs is active and no open PR exists)"
                   continue
                 fi
               fi
@@ -380,7 +461,7 @@ runs:
               if [ "$REPO_HAS_IMPROVEMENTS" = false ]; then
                 REPOS_WITH_IMPROVEMENTS=$((REPOS_WITH_IMPROVEMENTS + 1))
                 REPO_HAS_IMPROVEMENTS=true
-                log INFO "Phase 2: Repository ${REPO} has qualifying improvement branches"
+                log INFO "Phase 2: Repository ${OWNER}/${REPO} has qualifying improvement branches"
               fi
 
               # Check if branch is from a previous month
@@ -391,18 +472,18 @@ runs:
                   IS_PREV_MONTH=true
                 fi
               else
-                COMMIT_DATE=$(gh api "repos/${ORG_NAME}/${REPO}/branches/${BR}" --jq '.commit.commit.committer.date' 2>/dev/null || echo "")
+                COMMIT_DATE=$(gh api "repos/${OWNER}/${REPO}/branches/${BR}" --jq '.commit.commit.committer.date' 2>/dev/null || echo "")
                 if [ -n "$COMMIT_DATE" ] && [[ "${COMMIT_DATE:0:7}" < "$CURRENT_YM" ]]; then
                   IS_PREV_MONTH=true
                 fi
               fi
 
               if [ "$IS_PREV_MONTH" = true ]; then
-                log INFO "Phase 2: Improvement branch ${BR} in ${REPO} is from a previous month"
-                echo "${REPO}" >> "$PREV_MONTH_REPOS_FILE"
+                log INFO "Phase 2: Improvement branch ${BR} in ${OWNER}/${REPO} is from a previous month"
+                echo "${OWNER}|${REPO}" >> "$PREV_MONTH_REPOS_FILE"
               fi
 
-              echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${IS_PREV_MONTH}" >> "$BRANCHES_FILE"
+              echo "${OWNER}|${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${IS_PREV_MONTH}" >> "$BRANCHES_FILE"
             done < <(printf "%s\n" "$IMPROVEMENT_BRANCHES" | sort -r)
           fi
         done < "$RUNNER_TEMP/repos_metadata.txt"
@@ -423,7 +504,6 @@ runs:
       if: steps.phase2_branches.outputs.repos_with_improvements != '0'
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
-        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         set -Eeuo pipefail
@@ -442,24 +522,24 @@ runs:
         BRANCHES_RAW_FILE="$RUNNER_TEMP/branches_raw.txt"
         : > "$BRANCHES_RAW_FILE"
 
-        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR IS_PREV_MONTH; do
+        while IFS='|' read -r OWNER REPO DEFAULT_BRANCH VISIBILITY BR IS_PREV_MONTH; do
           [ -z "$REPO" ] && continue
           BRANCHES_ANALYZED=$((BRANCHES_ANALYZED + 1))
           BR_LAST_COMMIT=""
           PR_NUM=""
           RISK_LEVEL=""
 
-          log DEBUG "Phase 3: Analyzing branch ${BR} in ${REPO}"
-          AHEAD_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "0")
-          BEHIND_BY=$(gh api "repos/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.behind_by' 2>/dev/null || echo "0")
+          log DEBUG "Phase 3: Analyzing branch ${BR} in ${OWNER}/${REPO}"
+          AHEAD_BY=$(gh api "repos/${OWNER}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.ahead_by' 2>/dev/null || echo "0")
+          BEHIND_BY=$(gh api "repos/${OWNER}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}" --jq '.behind_by' 2>/dev/null || echo "0")
           
-          log INFO "Phase 3: Branch comparison - repo=${REPO} base=${DEFAULT_BRANCH} branch=${BR} ahead=${AHEAD_BY} behind=${BEHIND_BY}"
-          echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${AHEAD_BY}|${BEHIND_BY}" >> "$COMPARISON_FILE"
+          log INFO "Phase 3: Branch comparison - owner=${OWNER} repo=${REPO} base=${DEFAULT_BRANCH} branch=${BR} ahead=${AHEAD_BY} behind=${BEHIND_BY}"
+          echo "${OWNER}|${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${BR}|${AHEAD_BY}|${BEHIND_BY}" >> "$COMPARISON_FILE"
 
           # 1. Stale Branch Age Tracking
           AGE_TEXT=""
           if [ "${OPT_STALE_AGE:-false}" = "true" ]; then
-            COMMIT_DATE=$(gh api "repos/${ORG_NAME}/${REPO}/branches/${BR}" --jq '.commit.commit.committer.date' 2>/dev/null || echo "")
+            COMMIT_DATE=$(gh api "repos/${OWNER}/${REPO}/branches/${BR}" --jq '.commit.commit.committer.date' 2>/dev/null || echo "")
             BR_LAST_COMMIT="$COMMIT_DATE"
             if [ -n "$COMMIT_DATE" ]; then
               COMMIT_TS=$(date -d "$COMMIT_DATE" +%s 2>/dev/null || echo "")
@@ -487,7 +567,7 @@ runs:
           PR_STATE=""
           if [ "${OPT_PR_STATUS:-false}" = "true" ] || [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ]; then
             # Prefer an open PR; otherwise fall back to the most recent PR of any state
-            PR_JSON=$(gh pr list -R "${ORG_NAME}/${REPO}" -H "${BR}" --state all --limit 5 --json number,state,url,isDraft,reviewDecision --jq '(map(select(.state == "OPEN")) + .)[0]' 2>/dev/null || echo "")
+            PR_JSON=$(gh pr list -R "${OWNER}/${REPO}" -H "${BR}" --state all --limit 5 --json number,state,url,isDraft,reviewDecision --jq '(map(select(.state == "OPEN")) + .)[0]' 2>/dev/null || echo "")
             if [ -n "$PR_JSON" ] && [ "$PR_JSON" != "null" ]; then
               PR_NUM=$(echo "$PR_JSON" | jq -r '.number // ""')
               PR_STATE=$(echo "$PR_JSON" | jq -r '.state // ""')
@@ -514,14 +594,14 @@ runs:
                 *) PR_TEXT="PR ${PR_LINK} (${PR_STATE})" ;;
               esac
             else
-              PR_TEXT="➕ No PR yet: [create one](https://github.com/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}?expand=1)"
+              PR_TEXT="➕ No PR yet: [create one](https://github.com/${OWNER}/${REPO}/compare/${DEFAULT_BRANCH}...${BR}?expand=1)"
             fi
           fi
 
           # 3. Direct Diff & Comparison Deep-Links
           DIFF_TEXT=""
           if [ "${OPT_DIFF_LINKS:-false}" = "true" ]; then
-            DIFF_TEXT="[Compare](https://github.com/${ORG_NAME}/${REPO}/compare/${DEFAULT_BRANCH}...${BR})"
+            DIFF_TEXT="[Compare](https://github.com/${OWNER}/${REPO}/compare/${DEFAULT_BRANCH}...${BR})"
           fi
 
           # 4. Behind-Main & Conflict Risk Indicators
@@ -565,7 +645,7 @@ runs:
             # Flagged branches get a "sync with the default branch" command in the summary.
             # Merged branches are skipped (when PR status is known) since they are done.
             if [ "$CONFLICT_RISK" = true ] && [ "$PR_STATE" != "MERGED" ]; then
-              echo "${REPO}|${BR}|${DEFAULT_BRANCH}|${BEHIND}|${AHEAD}" >> "$SYNC_FILE"
+              echo "${OWNER}|${REPO}|${BR}|${DEFAULT_BRANCH}|${BEHIND}|${AHEAD}" >> "$SYNC_FILE"
             fi
           fi
 
@@ -584,12 +664,12 @@ runs:
 
           if [ "${OPT_CLEANUP_DISPATCH:-false}" = "true" ] && [ "$IS_CURRENT_MONTH" = false ] && [ "${IS_PREV_MONTH:-false}" = "true" ]; then
             if [ "${AHEAD_BY:-0}" -eq 0 ] || [ "$PR_STATE" = "MERGED" ]; then
-              echo "${REPO}|${BR}|${AHEAD_BY}|${PR_STATE}" >> "$CLEANUP_FILE"
+              echo "${OWNER}|${REPO}|${BR}|${AHEAD_BY}|${PR_STATE}" >> "$CLEANUP_FILE"
             fi
           fi
 
-          echo "${REPO}|${BR}|${AGE_TEXT}|${PR_TEXT}|${DIFF_TEXT}|${BEHIND_TEXT}" >> "$DETAILS_FILE"
-          echo "${REPO}|${DEFAULT_BRANCH}|${BR}|${IS_PREV_MONTH}|${AHEAD_BY}|${BEHIND_BY}|${BR_LAST_COMMIT}|${PR_NUM}|${PR_STATE}|${RISK_LEVEL}" >> "$BRANCHES_RAW_FILE"
+          echo "${OWNER}|${REPO}|${BR}|${AGE_TEXT}|${PR_TEXT}|${DIFF_TEXT}|${BEHIND_TEXT}" >> "$DETAILS_FILE"
+          echo "${OWNER}|${REPO}|${DEFAULT_BRANCH}|${BR}|${IS_PREV_MONTH}|${AHEAD_BY}|${BEHIND_BY}|${BR_LAST_COMMIT}|${PR_NUM}|${PR_STATE}|${RISK_LEVEL}" >> "$BRANCHES_RAW_FILE"
         done < "$RUNNER_TEMP/improvement_branches.txt"
 
         echo "branches_analyzed=${BRANCHES_ANALYZED}" >> "$GITHUB_OUTPUT"
@@ -600,7 +680,6 @@ runs:
       if: steps.enumerate.outputs.status == 'has_repos'
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
-        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         set -Eeuo pipefail
@@ -657,27 +736,27 @@ runs:
              ([range(0; '"${TREND_WEEKS}"')] | map($t["w\(.)"].totalCount // 0 | tostring) | join(","))]
           | join("|")'
 
-        while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY; do
+        while IFS='|' read -r OWNER REPO DEFAULT_BRANCH VISIBILITY; do
           [ -z "$REPO" ] && continue
           REPOS_MERGED_CHECKED=$((REPOS_MERGED_CHECKED + 1))
 
-          log DEBUG "Phase 4: Fetching merge history for ${REPO}"
-          LAST_MERGED=$(gh pr list -R "${ORG_NAME}/${REPO}" --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
+          log DEBUG "Phase 4: Fetching merge history for ${OWNER}/${REPO}"
+          LAST_MERGED=$(gh pr list -R "${OWNER}/${REPO}" --state merged --base "$DEFAULT_BRANCH" --limit 1 --json mergedAt --jq '.[0].mergedAt' 2>/dev/null || echo "")
           
           if [ -z "$LAST_MERGED" ]; then
-            log INFO "Phase 4: No merged PRs found for ${REPO} into ${DEFAULT_BRANCH}"
+            log INFO "Phase 4: No merged PRs found for ${OWNER}/${REPO} into ${DEFAULT_BRANCH}"
             LAST_MERGED="none"
           else
-            log INFO "Phase 4: Last merged PR for ${REPO}: ${LAST_MERGED}"
+            log INFO "Phase 4: Last merged PR for ${OWNER}/${REPO}: ${LAST_MERGED}"
           fi
 
-          echo "${REPO}|${LAST_MERGED}" >> "$MERGE_FILE"
+          echo "${OWNER}|${REPO}|${LAST_MERGED}" >> "$MERGE_FILE"
 
           # Main branch activity
-          MAIN_ROW=$(gh api graphql -f query="$MAIN_QUERY" -f owner="$ORG_NAME" -f name="$REPO" -f base="$DEFAULT_BRANCH" --jq "$MAIN_JQ" 2>/dev/null || echo "")
+          MAIN_ROW=$(gh api graphql -f query="$MAIN_QUERY" -f owner="$OWNER" -f name="$REPO" -f base="$DEFAULT_BRANCH" --jq "$MAIN_JQ" 2>/dev/null || echo "")
           IFS='|' read -r LAST_COMMIT OPEN_PRS COUNTS WEEK_COUNTS <<< "${MAIN_ROW:-|||}"
           if [ -z "$MAIN_ROW" ]; then
-            log WARN "Phase 4: Could not read ${DEFAULT_BRANCH} activity for ${REPO}"
+            log WARN "Phase 4: Could not read ${DEFAULT_BRANCH} activity for ${OWNER}/${REPO}"
           fi
 
           TOTAL=0
@@ -697,8 +776,8 @@ runs:
             fi
           fi
 
-          log INFO "Phase 4: ${REPO} ${DEFAULT_BRANCH} activity=${ACTIVITY} last_commit=${LAST_COMMIT:-none} commits_by_month=${COUNTS:-n/a} commits_by_week=${WEEK_COUNTS:-n/a} open_prs=${OPEN_PRS:-n/a}"
-          echo "${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${LAST_COMMIT}|${DAYS_SINCE}|${ACTIVITY}|${OPEN_PRS:-0}|${TOTAL}|${COUNTS}|${LAST_MERGED}|${WEEK_COUNTS:-}" >> "$MAIN_FILE"
+          log INFO "Phase 4: ${OWNER}/${REPO} ${DEFAULT_BRANCH} activity=${ACTIVITY} last_commit=${LAST_COMMIT:-none} commits_by_month=${COUNTS:-n/a} commits_by_week=${WEEK_COUNTS:-n/a} open_prs=${OPEN_PRS:-n/a}"
+          echo "${OWNER}|${REPO}|${DEFAULT_BRANCH}|${VISIBILITY}|${LAST_COMMIT}|${DAYS_SINCE}|${ACTIVITY}|${OPEN_PRS:-0}|${TOTAL}|${COUNTS}|${LAST_MERGED}|${WEEK_COUNTS:-}" >> "$MAIN_FILE"
         done < "$RUNNER_TEMP/repos_metadata.txt"
 
         echo "repos_checked=${REPOS_MERGED_CHECKED}" >> "$GITHUB_OUTPUT"
@@ -726,10 +805,10 @@ runs:
 
         if [ -f "$RUNNER_TEMP/branch_comparisons.txt" ]; then
           log DEBUG "Phase 5: Generating comparison details report"
-          while IFS='|' read -r REPO DEFAULT_BRANCH VISIBILITY BR AHEAD BEHIND; do
+          while IFS='|' read -r OWNER REPO DEFAULT_BRANCH VISIBILITY BR AHEAD BEHIND; do
             [ -z "$REPO" ] && continue
-            echo "::group::Report for ${REPO}/${BR}"
-            log INFO "Comparison: repo=${REPO} base=${DEFAULT_BRANCH} branch=${BR} ahead=${AHEAD} behind=${BEHIND}"
+            echo "::group::Report for ${OWNER}/${REPO}/${BR}"
+            log INFO "Comparison: owner=${OWNER} repo=${REPO} base=${DEFAULT_BRANCH} branch=${BR} ahead=${AHEAD} behind=${BEHIND}"
             echo "::endgroup::"
           done < "$RUNNER_TEMP/branch_comparisons.txt"
         fi
@@ -741,10 +820,150 @@ runs:
         log INFO "Phase 5 completed: Results aggregation finished"
         log INFO "Processing workflow completed successfully"
 
+    - name: Render multi-owner overview
+      if: steps.enumerate.outputs.status == 'has_repos' && env.MULTI_OWNER == 'true'
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        MAIN_FILE="$RUNNER_TEMP/main_activity.txt"
+        BRANCHES_FILE="$RUNNER_TEMP/improvement_branches.txt"
+        OWNER_COUNTS_FILE="$RUNNER_TEMP/owner_repo_counts.txt"
+        SECTION_FILE="$RUNNER_TEMP/multi_owner_section.md"
+        : > "$SECTION_FILE"
+        [ -s "$MAIN_FILE" ] || exit 0
+        mapfile -t MONTHS < "$RUNNER_TEMP/trend_months.txt"
+        mapfile -t WEEKS < "$RUNNER_TEMP/trend_weeks.txt"
+        N_MONTHS=${#MONTHS[@]}
+        N_WEEKS=${#WEEKS[@]}
+
+        USER_COUNT=0
+        ORG_COUNT=0
+        TOT_REPOS=0
+        TOT_ACTIVE=0
+        TOT_QUIET=0
+        TOT_DORMANT=0
+        TOT_COMMITS_6M=0
+        TOT_COMMITS_6W=0
+        TOT_OPEN_PRS=0
+        TOT_IMP_BRANCHES=0
+        TOT_IMP_REPOS=0
+        ALL_MONTH_TOTALS=()
+        for ((i = 0; i < N_MONTHS; i++)); do ALL_MONTH_TOTALS+=(0); done
+
+        OWNER_LABELS=()
+        OWNER_COMMITS=()
+        OWNER_PEAK=1
+        TABLE_ROWS=()
+
+        while IFS='|' read -r OWNER OWNER_TYPE _; do
+          [ -z "$OWNER" ] && continue
+          TYPE_BADGE="❔ ${OWNER_TYPE}"
+          case "$OWNER_TYPE" in
+            User) TYPE_BADGE="👤 User"; USER_COUNT=$((USER_COUNT + 1)) ;;
+            Organization) TYPE_BADGE="🏢 Org"; ORG_COUNT=$((ORG_COUNT + 1)) ;;
+          esac
+
+          O_REPOS=0
+          O_ACTIVE=0
+          O_QUIET=0
+          O_DORMANT=0
+          O_COMMITS_6M=0
+          O_COMMITS_6W=0
+          O_OPEN_PRS=0
+          O_MONTHS=()
+          for ((i = 0; i < N_MONTHS; i++)); do O_MONTHS+=(0); done
+
+          while IFS='|' read -r M_OWNER M_REPO _ _ _ _ M_ACT M_PRS M_TOTAL M_COUNTS _ M_WEEKS; do
+            [ "$M_OWNER" = "$OWNER" ] || continue
+            O_REPOS=$((O_REPOS + 1))
+            case "$M_ACT" in
+              active) O_ACTIVE=$((O_ACTIVE + 1)) ;;
+              quiet) O_QUIET=$((O_QUIET + 1)) ;;
+              *) O_DORMANT=$((O_DORMANT + 1)) ;;
+            esac
+            O_COMMITS_6M=$((O_COMMITS_6M + ${M_TOTAL:-0}))
+            O_OPEN_PRS=$((O_OPEN_PRS + ${M_PRS:-0}))
+            IFS=',' read -r -a M_LIST <<< "$M_COUNTS"
+            for i in "${!M_LIST[@]}"; do
+              O_MONTHS[$i]=$(( O_MONTHS[$i] + ${M_LIST[$i]:-0} ))
+              ALL_MONTH_TOTALS[$i]=$(( ALL_MONTH_TOTALS[$i] + ${M_LIST[$i]:-0} ))
+            done
+            IFS=',' read -r -a W_LIST <<< "$M_WEEKS"
+            for w in "${W_LIST[@]}"; do
+              O_COMMITS_6W=$((O_COMMITS_6W + ${w:-0}))
+            done
+          done < "$MAIN_FILE"
+
+          O_IMP_BRANCHES=0
+          O_IMP_REPOS=0
+          if [ -s "$BRANCHES_FILE" ]; then
+            O_IMP_BRANCHES=$(awk -F'|' -v o="$OWNER" '$1 == o { c++ } END { print c+0 }' "$BRANCHES_FILE")
+            O_IMP_REPOS=$(awk -F'|' -v o="$OWNER" '$1 == o { print $2 }' "$BRANCHES_FILE" | sort -u | sed '/^\s*$/d' | wc -l | tr -d ' ')
+          fi
+
+          O_COUNTS_CSV=$(IFS=','; echo "${O_MONTHS[*]}")
+          O_SPARK=$(sparkline "$O_COUNTS_CSV")
+          if [ "$O_IMP_BRANCHES" -gt 0 ]; then
+            IMP_CELL="${O_IMP_BRANCHES} (${O_IMP_REPOS} repos)"
+          else
+            IMP_CELL="0"
+          fi
+
+          TABLE_ROWS+=("| [${OWNER}](https://github.com/${OWNER}) | ${TYPE_BADGE} | ${O_REPOS} | ${O_ACTIVE} | ${O_QUIET} | ${O_DORMANT} | \`${O_SPARK}\` | ${O_COMMITS_6M} | ${O_COMMITS_6W} | ${O_OPEN_PRS} | ${IMP_CELL} |")
+
+          OWNER_LABELS+=("$OWNER")
+          OWNER_COMMITS+=("$O_COMMITS_6M")
+          if [ "$O_COMMITS_6M" -gt "$OWNER_PEAK" ]; then OWNER_PEAK="$O_COMMITS_6M"; fi
+
+          TOT_REPOS=$((TOT_REPOS + O_REPOS))
+          TOT_ACTIVE=$((TOT_ACTIVE + O_ACTIVE))
+          TOT_QUIET=$((TOT_QUIET + O_QUIET))
+          TOT_DORMANT=$((TOT_DORMANT + O_DORMANT))
+          TOT_COMMITS_6M=$((TOT_COMMITS_6M + O_COMMITS_6M))
+          TOT_COMMITS_6W=$((TOT_COMMITS_6W + O_COMMITS_6W))
+          TOT_OPEN_PRS=$((TOT_OPEN_PRS + O_OPEN_PRS))
+          TOT_IMP_BRANCHES=$((TOT_IMP_BRANCHES + O_IMP_BRANCHES))
+          TOT_IMP_REPOS=$((TOT_IMP_REPOS + O_IMP_REPOS))
+        done < "$OWNER_COUNTS_FILE"
+
+        ALL_COUNTS_CSV=$(IFS=','; echo "${ALL_MONTH_TOTALS[*]}")
+        ALL_SPARK=$(sparkline "$ALL_COUNTS_CSV")
+        if [ "$TOT_IMP_BRANCHES" -gt 0 ]; then
+          TOT_IMP_CELL="**${TOT_IMP_BRANCHES} (${TOT_IMP_REPOS} repos)**"
+        else
+          TOT_IMP_CELL="**0**"
+        fi
+
+        OWNER_Y_MAX=$(( OWNER_PEAK + (OWNER_PEAK + 4) / 5 ))
+        if [ "$OWNER_Y_MAX" -lt 4 ]; then OWNER_Y_MAX=4; fi
+        OWNER_X_AXIS=$(printf '"%s", ' "${OWNER_LABELS[@]}"); OWNER_X_AXIS="[${OWNER_X_AXIS%, }]"
+        OWNER_SERIES=$(printf '%s, ' "${OWNER_COMMITS[@]}"); OWNER_SERIES="[${OWNER_SERIES%, }]"
+
+        {
+          echo "### Multi-Owner Overview"
+          echo ""
+          echo "Consolidated breakdown across ${OWNER_COUNT} owners (${USER_COUNT} personal account(s), ${ORG_COUNT} organization(s)):"
+          echo ""
+          echo "| Owner | Type | Repos | ✨ Active | 🌙 Quiet | 💤 Dormant | Trend (${MONTHS[0]} → ${MONTHS[$((N_MONTHS - 1))]}) | Commits (${N_MONTHS}m) | Commits (${N_WEEKS}w) | Open PRs | Improvement branches |"
+          echo "| --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |"
+          for row in "${TABLE_ROWS[@]}"; do
+            echo "$row"
+          done
+          echo "| **Total** | **${OWNER_COUNT} owners** | **${TOT_REPOS}** | **${TOT_ACTIVE}** | **${TOT_QUIET}** | **${TOT_DORMANT}** | \`${ALL_SPARK}\` | **${TOT_COMMITS_6M}** | **${TOT_COMMITS_6W}** | **${TOT_OPEN_PRS}** | ${TOT_IMP_CELL} |"
+          echo ""
+          echo '```mermaid'
+          echo "xychart-beta"
+          echo "    title \"Commits to default branches by owner (last ${N_MONTHS} months)\""
+          echo "    x-axis ${OWNER_X_AXIS}"
+          echo "    y-axis \"Commits\" 0 --> ${OWNER_Y_MAX}"
+          echo "    bar ${OWNER_SERIES}"
+          echo '```'
+          echo ""
+        } > "$SECTION_FILE"
+        log INFO "Rendered multi-owner overview for ${OWNER_COUNT} owners"
+
     - name: Render main branch trend
       if: steps.enumerate.outputs.status == 'has_repos'
-      env:
-        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         set -Eeuo pipefail
@@ -757,28 +976,6 @@ runs:
         N_MONTHS=${#MONTHS[@]}
         N_WEEKS=${#WEEKS[@]}
 
-        # Per-row sparkline scaled to the row's own peak; "·" = no commits that month
-        sparkline() {
-          local -a counts bars=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █)
-          local c max=0 out=""
-          IFS=',' read -r -a counts <<< "$1"
-          for c in "${counts[@]}"; do
-            if [ "${c:-0}" -gt "$max" ]; then max="$c"; fi
-          done
-          for c in "${counts[@]}"; do
-            if [ "${c:-0}" -eq 0 ]; then out+="·"; else out+="${bars[$(( c * 7 / max ))]}"; fi
-          done
-          echo "${out:-–}"
-        }
-        activity_label() {
-          case "$1" in
-            active) echo "✨ Active" ;;
-            quiet) echo "🌙 Quiet" ;;
-            dormant) echo "💤 Dormant" ;;
-            *) echo "❔ Unknown" ;;
-          esac
-        }
-
         # Totals across all repos
         declare -A ACT_COUNT=([active]=0 [quiet]=0 [dormant]=0 [unknown]=0)
         MONTH_TOTALS=()
@@ -790,7 +987,7 @@ runs:
         ROWS_FILE="$RUNNER_TEMP/main_rows.txt"
         : > "$ROWS_FILE"
 
-        while IFS='|' read -r REPO BRANCH VIS LAST_COMMIT DAYS ACTIVITY OPEN_PRS TOTAL COUNTS LAST_MERGED WEEK_COUNTS; do
+        while IFS='|' read -r OWNER REPO BRANCH VIS LAST_COMMIT DAYS ACTIVITY OPEN_PRS TOTAL COUNTS LAST_MERGED WEEK_COUNTS; do
           [ -z "$REPO" ] && continue
           REPO_COUNT=$((REPO_COUNT + 1))
           ACT_COUNT[$ACTIVITY]=$(( ${ACT_COUNT[$ACTIVITY]:-0} + 1 ))
@@ -806,7 +1003,7 @@ runs:
           # Sort key: active/quiet first (most commits, then most recent), dormant/unknown after
           GROUP=0
           case "$ACTIVITY" in dormant|unknown) GROUP=1 ;; esac
-          echo "${GROUP}|${TOTAL:-0}|${DAYS:-99999}|${REPO}|${BRANCH}|${LAST_COMMIT}|${DAYS}|${ACTIVITY}|${OPEN_PRS:-0}|${COUNTS}|${LAST_MERGED}|${WEEK_COUNTS:-}" >> "$ROWS_FILE"
+          echo "${GROUP}|${TOTAL:-0}|${DAYS:-99999}|${OWNER}|${REPO}|${BRANCH}|${LAST_COMMIT}|${DAYS}|${ACTIVITY}|${OPEN_PRS:-0}|${COUNTS}|${LAST_MERGED}|${WEEK_COUNTS:-}" >> "$ROWS_FILE"
         done < "$MAIN_FILE"
         sort -t'|' -k1,1n -k2,2nr -k3,3n -o "$ROWS_FILE" "$ROWS_FILE"
 
@@ -854,13 +1051,14 @@ runs:
           echo "| --- | --- | --- | --- | --- | ---: | ---: | --- |"
         }
         table_row() {
-          local repo="$1" branch="$2" last="$3" days="$4" activity="$5" prs="$6" counts="$7" merged="$8" total="$9"
-          local last_text="–" merged_text="–"
+          local owner="$1" repo="$2" branch="$3" last="$4" days="$5" activity="$6" prs="$7" counts="$8" merged="$9" total="${10}"
+          local last_text="–" merged_text="–" label
+          label=$(repo_label "$owner" "$repo")
           if [ -n "$last" ]; then last_text="$(days_ago "$days") (${last:0:10})"; fi
           if [ -n "$merged" ] && [ "$merged" != "none" ]; then
             merged_text=$(days_ago "$(days_since "$merged")")
           fi
-          echo "| [${repo}](https://github.com/${ORG_NAME}/${repo}) | [\`${branch}\`](https://github.com/${ORG_NAME}/${repo}/commits/${branch}) | $(activity_label "$activity") | ${last_text} | \`$(sparkline "$counts")\` | ${total} | ${prs} | ${merged_text} |"
+          echo "| [${label}](https://github.com/${owner}/${repo}) | [\`${branch}\`](https://github.com/${owner}/${repo}/commits/${branch}) | $(activity_label "$activity") | ${last_text} | \`$(sparkline "$counts")\` | ${total} | ${prs} | ${merged_text} |"
         }
 
         {
@@ -917,11 +1115,12 @@ runs:
             echo "    title Share of commits to default branches (last ${N_MONTHS} months)"
             OTHER=0
             RANK=0
-            while IFS='|' read -r _ TOTAL _ REPO _; do
+            while IFS='|' read -r _ TOTAL _ OWNER REPO _; do
               [ "${TOTAL:-0}" -gt 0 ] || continue
               RANK=$((RANK + 1))
+              LABEL=$(repo_label "$OWNER" "$REPO")
               if [ "$RANK" -le 8 ]; then
-                echo "    \"${REPO}\" : ${TOTAL}"
+                echo "    \"${LABEL}\" : ${TOTAL}"
               else
                 OTHER=$((OTHER + TOTAL))
               fi
@@ -932,9 +1131,9 @@ runs:
           fi
 
           table_header
-          while IFS='|' read -r GROUP TOTAL _ REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED WEEK_COUNTS; do
+          while IFS='|' read -r GROUP TOTAL _ OWNER REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED WEEK_COUNTS; do
             if [ "$GROUP" = "0" ]; then
-              table_row "$REPO" "$BRANCH" "$LAST" "$DAYS" "$ACTIVITY" "$PRS" "$COUNTS" "$MERGED" "$TOTAL"
+              table_row "$OWNER" "$REPO" "$BRANCH" "$LAST" "$DAYS" "$ACTIVITY" "$PRS" "$COUNTS" "$MERGED" "$TOTAL"
             fi
           done < "$ROWS_FILE"
           echo ""
@@ -944,9 +1143,9 @@ runs:
             echo "<details><summary>💤 ${IDLE_COUNT} dormant or unknown repos</summary>"
             echo ""
             table_header
-            while IFS='|' read -r GROUP TOTAL _ REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED WEEK_COUNTS; do
+            while IFS='|' read -r GROUP TOTAL _ OWNER REPO BRANCH LAST DAYS ACTIVITY PRS COUNTS MERGED WEEK_COUNTS; do
               if [ "$GROUP" = "1" ]; then
-                table_row "$REPO" "$BRANCH" "$LAST" "$DAYS" "$ACTIVITY" "$PRS" "$COUNTS" "$MERGED" "$TOTAL"
+                table_row "$OWNER" "$REPO" "$BRANCH" "$LAST" "$DAYS" "$ACTIVITY" "$PRS" "$COUNTS" "$MERGED" "$TOTAL"
               fi
             done < "$ROWS_FILE"
             echo ""
@@ -958,8 +1157,6 @@ runs:
 
     - name: Summary with Github repos
       if: steps.enumerate.outputs.status == 'has_repos'
-      env:
-        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         COUNT="${{ steps.enumerate.outputs.count }}"
@@ -969,6 +1166,7 @@ runs:
         DETAILS_FILE="$RUNNER_TEMP/branch_details.txt"
         CLEANUP_FILE="$RUNNER_TEMP/cleanup_candidates.txt"
         SYNC_FILE="$RUNNER_TEMP/sync_candidates.txt"
+        MULTI_OWNER_SECTION_FILE="$RUNNER_TEMP/multi_owner_section.md"
         MAIN_SECTION_FILE="$RUNNER_TEMP/main_section.md"
         THRESHOLD="${OPT_BEHIND_THRESHOLD:-10}"
         # A copy of the summary is kept as report.md in the exported artifact
@@ -999,11 +1197,18 @@ runs:
         {
           echo "### www.andres.nz Github Repos summary"
           echo ""
-          echo "- Org: ${ORG_NAME}"
+          if [ "${MULTI_OWNER:-false}" = "true" ]; then
+            echo "- Owners (${OWNER_COUNT}): ${OWNERS_DISPLAY}"
+          else
+            echo "- Org: ${OWNERS_DISPLAY}"
+          fi
           echo "- Selected repos: ${COUNT}"
           echo "- Repos with improvement branches: ${IMP}"
           echo "- Reporting tweaks: ${OPTIONS_STR}"
           echo ""
+          if [ -s "$MULTI_OWNER_SECTION_FILE" ]; then
+            cat "$MULTI_OWNER_SECTION_FILE"
+          fi
           if [ -s "$MAIN_SECTION_FILE" ]; then
             cat "$MAIN_SECTION_FILE"
           fi
@@ -1025,14 +1230,17 @@ runs:
           fi
           if [ -s "$PREV_REPOS_FILE" ]; then
             INDEX=1
-            while IFS= read -r REPO; do
-              [ -z "$REPO" ] && continue
-              echo "${INDEX}. [${REPO}](https://github.com/${ORG_NAME}/${REPO})"
+            while IFS='|' read -r P_OWNER P_REPO; do
+              [ -z "$P_REPO" ] && continue
+              P_LABEL=$(repo_label "$P_OWNER" "$P_REPO")
+              echo "${INDEX}. [${P_LABEL}](https://github.com/${P_OWNER}/${P_REPO})"
               INDEX=$((INDEX + 1))
 
               if [ "$HAS_ENRICHED" = true ] && [ -f "$DETAILS_FILE" ]; then
-                while IFS='|' read -r D_REPO D_BR D_AGE D_PR D_DIFF D_BEHIND; do
-                  [ "$D_REPO" != "$REPO" ] && continue
+                while IFS='|' read -r D_OWNER D_REPO D_BR D_AGE D_PR D_DIFF D_BEHIND; do
+                  if [ "$D_OWNER" != "$P_OWNER" ] || [ "$D_REPO" != "$P_REPO" ]; then
+                    continue
+                  fi
                   TAGS=()
                   [ -n "$D_AGE" ] && TAGS+=("$D_AGE")
                   [ -n "$D_PR" ] && TAGS+=("$D_PR")
@@ -1061,13 +1269,14 @@ runs:
             if [ -s "$CLEANUP_FILE" ]; then
               echo "The following improvement branches from **previous months** have 0 commits ahead or are already merged and can safely be deleted (current month branches are preserved):"
               echo ""
-              while IFS='|' read -r C_REPO C_BR C_AHEAD C_STATE; do
+              while IFS='|' read -r C_OWNER C_REPO C_BR C_AHEAD C_STATE; do
                 [ -z "$C_REPO" ] && continue
+                C_LABEL=$(repo_label "$C_OWNER" "$C_REPO")
                 REASON="0 ahead"
                 [ "$C_STATE" = "MERGED" ] && REASON="merged"
-                echo "- **${C_REPO}**: \`${C_BR}\` (${REASON})"
+                echo "- **${C_LABEL}**: \`${C_BR}\` (${REASON})"
                 echo "  \`\`\`bash"
-                echo "  gh api --method DELETE -H \"Accept: application/vnd.github+json\" -H \"X-GitHub-Api-Version: 2026-03-10\" repos/${ORG_NAME}/${C_REPO}/git/refs/heads/${C_BR}"
+                echo "  gh api --method DELETE -H \"Accept: application/vnd.github+json\" -H \"X-GitHub-Api-Version: 2026-03-10\" repos/${C_OWNER}/${C_REPO}/git/refs/heads/${C_BR}"
                 echo "  \`\`\`"
               done < "$CLEANUP_FILE"
             else
@@ -1085,11 +1294,12 @@ runs:
             if [ -s "$SYNC_FILE" ]; then
               echo "These improvement branches are more than ${THRESHOLD} commits behind their default branch. Merge the default branch into them now, while conflicts are still small:"
               echo ""
-              while IFS='|' read -r S_REPO S_BR S_BASE S_BEHIND S_AHEAD; do
+              while IFS='|' read -r S_OWNER S_REPO S_BR S_BASE S_BEHIND S_AHEAD; do
                 [ -z "$S_REPO" ] && continue
-                echo "- **${S_REPO}**: \`${S_BR}\` (${S_BEHIND} behind \`${S_BASE}\`, ${S_AHEAD} ahead)"
+                S_LABEL=$(repo_label "$S_OWNER" "$S_REPO")
+                echo "- **${S_LABEL}**: \`${S_BR}\` (${S_BEHIND} behind \`${S_BASE}\`, ${S_AHEAD} ahead)"
                 echo "  \`\`\`bash"
-                echo "  gh api --method POST -H \"Accept: application/vnd.github+json\" -H \"X-GitHub-Api-Version: 2026-03-10\" repos/${ORG_NAME}/${S_REPO}/merges -f base=${S_BR} -f head=${S_BASE}"
+                echo "  gh api --method POST -H \"Accept: application/vnd.github+json\" -H \"X-GitHub-Api-Version: 2026-03-10\" repos/${S_OWNER}/${S_REPO}/merges -f base=${S_BR} -f head=${S_BASE}"
                 echo "  \`\`\`"
               done < "$SYNC_FILE"
               echo ""
@@ -1105,8 +1315,6 @@ runs:
 
     - name: Export report data (JSON/CSV)
       if: steps.enumerate.outputs.status == 'has_repos'
-      env:
-        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         set -Eeuo pipefail
@@ -1118,68 +1326,70 @@ runs:
         GENERATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         MONTHS_JSON=$(jq -R . "$RUNNER_TEMP/trend_months.txt" | jq -s -c .)
         WEEKS_JSON=$(jq -R . "$RUNNER_TEMP/trend_weeks.txt" | jq -s -c .)
+        OWNERS_JSON=$(jq -R . "$RUNNER_TEMP/owners.txt" | jq -s -c .)
 
         # Raw data -> JSON (pipe-delimited files written by phases 3 and 4)
         jq -R -s -c --argjson months "$MONTHS_JSON" --argjson weeks "$WEEKS_JSON" '
           split("\n") | map(select(length > 0) | split("|")) | map({
-            repo: .[0], default_branch: .[1], visibility: .[2],
-            last_commit_at: (if .[3] == "" then null else .[3] end),
-            days_since_last_commit: (.[4] | tonumber? // null),
-            activity: .[5],
-            open_prs_to_default: (.[6] | tonumber? // 0),
-            commits_in_window: (.[7] | tonumber? // 0),
-            commits_by_month: ([$months, (.[8] // "" | split(","))] | transpose
+            owner: .[0], repo: .[1], default_branch: .[2], visibility: .[3],
+            last_commit_at: (if .[4] == "" then null else .[4] end),
+            days_since_last_commit: (.[5] | tonumber? // null),
+            activity: .[6],
+            open_prs_to_default: (.[7] | tonumber? // 0),
+            commits_in_window: (.[8] | tonumber? // 0),
+            commits_by_month: ([$months, (.[9] // "" | split(","))] | transpose
               | map(select(.[0] != null) | {(.[0]): (.[1] // "0" | tonumber? // 0)}) | add // {}),
-            commits_by_week: ([$weeks, (.[10] // "" | split(","))] | transpose
+            commits_by_week: ([$weeks, (.[11] // "" | split(","))] | transpose
               | map(select(.[0] != null) | {(.[0]): (.[1] // "0" | tonumber? // 0)}) | add // {}),
-            last_pr_merged_at: (if .[9] == "" or .[9] == "none" then null else .[9] end)
+            last_pr_merged_at: (if .[10] == "" or .[10] == "none" then null else .[10] end)
           })' "$MAIN_FILE" > "$REPORT_DIR/main_branches.json"
 
         jq -R -s -c '
           split("\n") | map(select(length > 0) | split("|")) | map({
-            repo: .[0], default_branch: .[1], branch: .[2],
-            from_previous_month: (.[3] == "true"),
-            ahead_by: (.[4] | tonumber? // null),
-            behind_by: (.[5] | tonumber? // null),
-            last_commit_at: (if .[6] == "" then null else .[6] end),
-            pr_number: (.[7] | tonumber? // null),
-            pr_state: (if .[8] == "" then null else .[8] end),
-            conflict_risk: (if .[9] == "" then null else .[9] end)
+            owner: .[0], repo: .[1], default_branch: .[2], branch: .[3],
+            from_previous_month: (.[4] == "true"),
+            ahead_by: (.[5] | tonumber? // null),
+            behind_by: (.[6] | tonumber? // null),
+            last_commit_at: (if .[7] == "" then null else .[7] end),
+            pr_number: (.[8] | tonumber? // null),
+            pr_state: (if .[9] == "" then null else .[9] end),
+            conflict_risk: (if .[10] == "" then null else .[10] end)
           })' "$BRANCHES_RAW_FILE" > "$REPORT_DIR/improvement_branches.json"
 
         # CSV: one row per repo (wide), one row per repo per month (long, for trend tools), one row per branch
         jq -r --argjson months "$MONTHS_JSON" '
-          (["repo","default_branch","visibility","last_commit_at","days_since_last_commit","activity",
+          (["owner","repo","default_branch","visibility","last_commit_at","days_since_last_commit","activity",
             "open_prs_to_default","last_pr_merged_at","commits_last_\($months | length)_months"]
             + ($months | map("commits_" + .))),
-          (.[] | [.repo, .default_branch, .visibility, .last_commit_at, .days_since_last_commit, .activity,
+          (.[] | [.owner, .repo, .default_branch, .visibility, .last_commit_at, .days_since_last_commit, .activity,
                   .open_prs_to_default, .last_pr_merged_at, .commits_in_window]
                  + [.commits_by_month[$months[]]])
           | @csv' "$REPORT_DIR/main_branches.json" > "$REPORT_DIR/main_branches.csv"
 
-        jq -r --arg date "${GENERATED_AT:0:10}" --arg owner "$ORG_NAME" '
+        jq -r --arg date "${GENERATED_AT:0:10}" '
           ["report_date","owner","repo","default_branch","month","commits"],
-          (.[] | . as $r | .commits_by_month | to_entries[] | [$date, $owner, $r.repo, $r.default_branch, .key, .value])
+          (.[] | . as $r | .commits_by_month | to_entries[] | [$date, $r.owner, $r.repo, $r.default_branch, .key, .value])
           | @csv' "$REPORT_DIR/main_branches.json" > "$REPORT_DIR/main_commits_monthly.csv"
 
-        jq -r --arg date "${GENERATED_AT:0:10}" --arg owner "$ORG_NAME" '
+        jq -r --arg date "${GENERATED_AT:0:10}" '
           ["report_date","owner","repo","default_branch","week_start_monday","week","commits"],
           (.[] | . as $r | .commits_by_week | to_entries[] |
-            [$date, $owner, $r.repo, $r.default_branch, .key,
+            [$date, $r.owner, $r.repo, $r.default_branch, .key,
              (.key | strptime("%Y-%m-%d") | mktime | strftime("%G-W%V")), .value])
           | @csv' "$REPORT_DIR/main_branches.json" > "$REPORT_DIR/main_commits_weekly.csv"
 
         jq -r '
-          ["repo","default_branch","branch","from_previous_month","ahead_by","behind_by",
+          ["owner","repo","default_branch","branch","from_previous_month","ahead_by","behind_by",
            "last_commit_at","pr_number","pr_state","conflict_risk"],
-          (.[] | [.repo, .default_branch, .branch, (.from_previous_month | tostring), .ahead_by, .behind_by,
+          (.[] | [.owner, .repo, .default_branch, .branch, (.from_previous_month | tostring), .ahead_by, .behind_by,
                   .last_commit_at, .pr_number, .pr_state, .conflict_risk])
           | @csv' "$REPORT_DIR/improvement_branches.json" > "$REPORT_DIR/improvement_branches.csv"
 
         # Aggregated metrics + run metadata
         jq -n \
           --arg generated_at "$GENERATED_AT" \
-          --arg owner "$ORG_NAME" \
+          --arg owner "$OWNERS_CSV" \
+          --argjson owners "$OWNERS_JSON" \
           --arg run_id "${GITHUB_RUN_ID}" \
           --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
           --argjson months "$MONTHS_JSON" \
@@ -1195,6 +1405,7 @@ runs:
           $repos[0] as $r | $branches[0] as $b | {
             generated_at: $generated_at,
             owner: $owner,
+            owners: $owners,
             run: {id: $run_id, url: $run_url},
             options: $options,
             trend_months: $months,
@@ -1206,10 +1417,25 @@ runs:
               main_commits_by_month: ($months | map(. as $m | {($m): ($r | map(.commits_by_month[$m] // 0) | add // 0)}) | add // {}),
               main_commits_by_week: ($weeks | map(. as $w | {($w): ($r | map(.commits_by_week[$w] // 0) | add // 0)}) | add // {}),
               open_prs_to_default: ($r | map(.open_prs_to_default) | add // 0),
-              repos_with_improvement_branches: ($b | map(.repo) | unique | length),
+              repos_with_improvement_branches: ($b | map("\(.owner)/\(.repo)") | unique | length),
               improvement_branches: ($b | length),
               improvement_branches_at_conflict_risk: ($b | map(select(.conflict_risk == "high" or .conflict_risk == "very_high")) | length)
-            }
+            },
+            by_owner: ($owners | map(. as $o
+              | ($r | map(select(.owner == $o))) as $or
+              | ($b | map(select(.owner == $o))) as $ob
+              | {($o): {
+                  repos: ($or | length),
+                  main_activity: ({active: 0, quiet: 0, dormant: 0, unknown: 0}
+                    + ($or | group_by(.activity) | map({(.[0].activity): length}) | add // {})),
+                  main_commits_by_month: ($months | map(. as $m | {($m): ($or | map(.commits_by_month[$m] // 0) | add // 0)}) | add // {}),
+                  main_commits_by_week: ($weeks | map(. as $w | {($w): ($or | map(.commits_by_week[$w] // 0) | add // 0)}) | add // {}),
+                  open_prs_to_default: ($or | map(.open_prs_to_default) | add // 0),
+                  repos_with_improvement_branches: ($ob | map(.repo) | unique | length),
+                  improvement_branches: ($ob | length),
+                  improvement_branches_at_conflict_risk: ($ob | map(select(.conflict_risk == "high" or .conflict_risk == "very_high")) | length)
+                }}
+            ) | add // {})
           }' > "$REPORT_DIR/summary.json"
 
         log INFO "Exported report data to ${REPORT_DIR}:"
@@ -1220,7 +1446,7 @@ runs:
       if: steps.enumerate.outputs.status == 'has_repos'
       uses: actions/upload-artifact@v7.0.1
       with:
-        name: repos-report-${{ inputs.org_name }}
+        name: repos-report-${{ steps.options.outputs.artifact_slug }}
         path: ${{ runner.temp }}/repos-report/
         retention-days: 90
         overwrite: true
@@ -1239,8 +1465,6 @@ runs:
 
     - name: Summary No repos
       if: steps.enumerate.outputs.status == 'no_repos'
-      env:
-        ORG_NAME: ${{ inputs.org_name }}
       shell: bash
       run: |
         CURRENT_MONTH=$(LC_ALL=C date +"%B %Y")
@@ -1263,7 +1487,11 @@ runs:
         {
           echo "### www.andres.nz Github Repos summary"
           echo ""
-          echo "- Org: ${ORG_NAME}"
+          if [ "${MULTI_OWNER:-false}" = "true" ]; then
+            echo "- Owners (${OWNER_COUNT}): ${OWNERS_DISPLAY}"
+          else
+            echo "- Org: ${OWNERS_DISPLAY}"
+          fi
           echo "- No repositories matched the selection."
           echo "- Reporting tweaks: ${OPTIONS_STR}"
           echo ""
@@ -1274,7 +1502,7 @@ runs:
           echo ""
           echo "## Recommended Next Steps"
           echo ""
-          echo "- Verify the organization name (\`${ORG_NAME}\`) and repository permissions."
+          echo "- Verify the owner/organization name(s) (\`${OWNERS_DISPLAY}\`) and repository permissions."
           echo "- Ensure the GitHub token has required read scopes across organization repositories."
           echo ""
           echo "_Report options and roadmap: [.github/readme.md](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/.github/readme.md#future-work)_"

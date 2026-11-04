@@ -6,9 +6,13 @@ inputs:
     description: GitHub token for authentication
     required: true
   owner:
-    description: User or org the token must be able to read (defaults to this repo's owner)
+    description: User(s) or org(s) the token must be able to read (comma-separated or 'all'; defaults to this repo's owner)
     required: false
     default: ""
+  default_owners:
+    description: Comma-separated owners used when owner is 'all'
+    required: false
+    default: "aleon1220,LearningSandboxNZ,secore-ai,spinnaker-hackathon"
 
 outputs:
   authenticated:
@@ -72,49 +76,64 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
         OWNER: ${{ inputs.owner || github.repository_owner }}
+        DEFAULT_OWNERS: ${{ inputs.default_owners }}
         THIS_REPO: ${{ github.repository }}
         TOKEN_OWNER: ${{ steps.validate.outputs.token_owner }}
         TOKEN_SCOPES: ${{ steps.validate.outputs.token_scopes }}
       run: |
         set -uo pipefail
 
-        echo "::group::Validating token access to ${OWNER}"
-        PROBLEMS=()
-
-        OWNER_TYPE=$(gh api "users/${OWNER}" --jq '.type' 2>/dev/null || echo "")
-        echo "Target: ${OWNER} (${OWNER_TYPE:-not found})"
-        if [ -z "$OWNER_TYPE" ]; then
-          PROBLEMS+=("'${OWNER}' was not found or is not visible to ${TOKEN_OWNER}")
+        RAW_OWNER="${OWNER}"
+        if [ "$RAW_OWNER" = "all" ]; then
+          RAW_OWNER="${DEFAULT_OWNERS}"
         fi
+        IFS=', ' read -r -a OWNERS <<< "$RAW_OWNER"
+
+        echo "::group::Validating token access to ${RAW_OWNER}"
+        PROBLEMS=()
+        NEEDS_ORG_SCOPE=false
+        VALIDATED_SUMMARY=()
+
+        for TARGET_OWNER in "${OWNERS[@]}"; do
+          [ -z "$TARGET_OWNER" ] && continue
+          OWNER_TYPE=$(gh api "users/${TARGET_OWNER}" --jq '.type' 2>/dev/null || echo "")
+          echo "Target: ${TARGET_OWNER} (${OWNER_TYPE:-not found})"
+          if [ -z "$OWNER_TYPE" ]; then
+            PROBLEMS+=("'${TARGET_OWNER}' was not found or is not visible to ${TOKEN_OWNER}")
+            continue
+          fi
+
+          if [ "$OWNER_TYPE" = "Organization" ]; then
+            NEEDS_ORG_SCOPE=true
+            STATE=$(gh api "user/memberships/orgs/${TARGET_OWNER}" --jq '.state' 2>/dev/null || echo "")
+            if [ "$STATE" = "active" ]; then
+              echo "Org membership: ${TOKEN_OWNER} is an active member of ${TARGET_OWNER}"
+            else
+              PROBLEMS+=("${TOKEN_OWNER} is not an active member of org '${TARGET_OWNER}' (or the token can't read memberships), so only public repos are visible")
+            fi
+          fi
+
+          # What the token can actually see
+          VISIBLE=$(gh repo list "$TARGET_OWNER" --limit 1000 --no-archived --json visibility \
+            --jq 'group_by(.visibility) | map("\(length) \(.[0].visibility | ascii_downcase)") | join(", ")' 2>/dev/null || echo "")
+          echo "Visible non-archived repos in ${TARGET_OWNER}: ${VISIBLE:-none}"
+          if [ -z "$VISIBLE" ]; then
+            PROBLEMS+=("no repositories in '${TARGET_OWNER}' are visible to the token")
+          else
+            VALIDATED_SUMMARY+=("${TARGET_OWNER} (${VISIBLE})")
+          fi
+        done
 
         # Classic tokens: check the scopes the reporter needs. Orgs also need read:org.
         if [[ "$TOKEN_SCOPES" != not\ listed* ]]; then
           REQUIRED_SCOPES=("repo" "workflow")
-          [ "$OWNER_TYPE" = "Organization" ] && REQUIRED_SCOPES+=("read:org")
+          [ "$NEEDS_ORG_SCOPE" = true ] && REQUIRED_SCOPES+=("read:org")
           for SCOPE in "${REQUIRED_SCOPES[@]}"; do
             if [[ ", ${TOKEN_SCOPES}, " != *", ${SCOPE}, "* ]] && \
                ! { [ "$SCOPE" = "read:org" ] && [[ ", ${TOKEN_SCOPES}, " == *", admin:org, "* ]]; }; then
               PROBLEMS+=("token is missing the '${SCOPE}' scope")
             fi
           done
-        fi
-
-        # Orgs: private repos are only visible to members
-        if [ "$OWNER_TYPE" = "Organization" ]; then
-          STATE=$(gh api "user/memberships/orgs/${OWNER}" --jq '.state' 2>/dev/null || echo "")
-          if [ "$STATE" = "active" ]; then
-            echo "Org membership: ${TOKEN_OWNER} is an active member of ${OWNER}"
-          else
-            PROBLEMS+=("${TOKEN_OWNER} is not an active member of org '${OWNER}' (or the token can't read memberships), so only public repos are visible")
-          fi
-        fi
-
-        # What the token can actually see
-        VISIBLE=$(gh repo list "$OWNER" --limit 1000 --no-archived --json visibility \
-          --jq 'group_by(.visibility) | map("\(length) \(.[0].visibility | ascii_downcase)") | join(", ")' 2>/dev/null || echo "")
-        echo "Visible non-archived repos in ${OWNER}: ${VISIBLE:-none}"
-        if [ -z "$VISIBLE" ]; then
-          PROBLEMS+=("no repositories in '${OWNER}' are visible to the token")
         fi
 
         if ! gh api "repos/${THIS_REPO}/actions/runs?per_page=1" --silent 2>/dev/null; then
@@ -129,6 +148,7 @@ runs:
           echo "::warning::See .github/readme.md (Token and access) for how to fix token access"
           echo "permissions_valid=false" >> $GITHUB_OUTPUT
         else
-          echo "::notice::✓ Token for ${TOKEN_OWNER} can read ${OWNER} (${VISIBLE})"
+          SUMMARY_STR=$(IFS='; '; echo "${VALIDATED_SUMMARY[*]}")
+          echo "::notice::✓ Token for ${TOKEN_OWNER} can read ${SUMMARY_STR}"
           echo "permissions_valid=true" >> $GITHUB_OUTPUT
         fi
